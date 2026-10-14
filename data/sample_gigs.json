@@ -1,0 +1,90 @@
+[
+  {
+    "id": "g_sample_0001",
+    "title": "Promote a new bakery menu on Instagram",
+    "business_name": "Sunrise Bakery",
+    "work_needed": "I run a small bakery and want help promoting my new seasonal menu on Instagram.",
+    "desired_outcome": "More local customers know about the new menu and visit the shop.",
+    "budget_inr": 800,
+    "deadline": "2 days",
+    "additional_context": "Most customers are nearby families. We already post occasionally on Instagram.",
+    "brief": {
+      "project_objective": "Promote the bakery's new seasonal menu to local families on Instagram and encourage more shop visits.",
+      "proposed_deliverables": [
+        "Three Instagram posts (images with captions) featuring the new menu items",
+        "One short caption pack the owner can reuse for stories",
+        "A simple posting schedule for the two-day window"
+      ],
+      "required_skills": [
+        "Social media content creation",
+        "Basic graphic design",
+        "Copywriting"
+      ],
+      "clarifying_questions": [
+        "Which menu items should be featured, and do you have photos of them?",
+        "Do you have brand colours or a logo we should use?",
+        "Is there a specific call to action, such as a limited-time offer?"
+      ],
+      "acceptance_criteria": [
+        "Three ready-to-post images with captions are delivered",
+        "Captions mention the new menu and a clear call to action",
+        "Content matches the bakery's existing look and feel"
+      ],
+      "assumptions": [
+        "The bakery already has an Instagram account",
+        "The owner can provide or approve photos of the menu items"
+      ],
+      "scope_deadline_concerns": [
+        "Two days is a short window if photos still need to be taken",
+        "The number of revisions the owner wants is not yet specified"
+      ]
+    },
+    "status": "open",
+    "created_at": "2026-10-15T09:00:00+00:00",
+    "sample": true
+  },
+  {
+    "id": "g_sample_0002",
+    "title": "Build a simple one-page website for a tutoring service",
+    "business_name": "Bright Minds Tutoring",
+    "work_needed": "We need a simple one-page website that explains our tutoring service and how to book a session.",
+    "desired_outcome": "Parents can understand what we offer and contact us from a clear page.",
+    "budget_inr": 2500,
+    "deadline": "10 days",
+    "additional_context": "We do not have a logo yet, but we can provide text and a phone number.",
+    "brief": {
+      "project_objective": "Create a clear, mobile-friendly one-page website for a tutoring service that explains the offering and makes it easy to get in touch.",
+      "proposed_deliverables": [
+        "A single responsive page with an intro, services, and contact section",
+        "Simple styling that works on phones and desktops",
+        "A short guide for the owner on how to update the text"
+      ],
+      "required_skills": [
+        "HTML and CSS",
+        "Basic responsive design",
+        "Clear written communication"
+      ],
+      "clarifying_questions": [
+        "Where will the site be hosted, and do you already own a domain?",
+        "Which contact method should be the main call to action?",
+        "What subjects and age groups should the services section list?"
+      ],
+      "acceptance_criteria": [
+        "The page displays correctly on a phone and a desktop",
+        "Services and contact details are accurate and easy to find",
+        "The owner has simple instructions for editing the text"
+      ],
+      "assumptions": [
+        "The owner can provide the text content and contact details",
+        "A simple static page is enough for now; no online booking system is required"
+      ],
+      "scope_deadline_concerns": [
+        "Adding online booking later would be a separate, larger task",
+        "There is no logo yet, so a simple text header will be used"
+      ]
+    },
+    "status": "open",
+    "created_at": "2026-10-15T09:05:00+00:00",
+    "sample": true
+  }
+]
