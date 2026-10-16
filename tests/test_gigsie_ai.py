@@ -122,6 +122,15 @@ class GenerateTaskBriefTests(unittest.TestCase):
         self.assertEqual(result["validation"], [])
         self.assertIn("raw", result)
 
+    def test_model_warnings_are_preserved(self):
+        client, _ = _client_returning(json.dumps(GOOD_BRIEF))
+        with mock.patch.object(ai, "get_client", return_value=client):
+            result = ai.generate_task_brief(dict(VALID_REQUEST))
+        # The model's own "warnings" field is kept in the brief, distinct from
+        # the deterministic findings in result["validation"].
+        self.assertEqual(result["brief"]["warnings"], GOOD_BRIEF["warnings"])
+        self.assertEqual(result["problems"], [])
+
     def test_fenced_output_is_recovered(self):
         text = "```json\n" + json.dumps(GOOD_BRIEF) + "\n```"
         client, _ = _client_returning(text)
@@ -271,6 +280,16 @@ class ErrorHandlingTests(unittest.TestCase):
 
     def test_missing_required_content_raises(self):
         partial = {"title": "A title", "objective": "An objective"}  # no deliverables
+        client, _ = _client_returning(json.dumps(partial))
+        with mock.patch.object(ai, "get_client", return_value=client):
+            with self.assertRaises(ai.GigsieAIError) as ctx:
+                ai.generate_task_brief(dict(VALID_REQUEST))
+        self.assertIn("missing required content", str(ctx.exception).lower())
+
+    def test_missing_title_is_missing_required_content(self):
+        # "title" is one of the required brief fields, so a reply without it is
+        # rejected rather than silently accepted.
+        partial = {"objective": "An objective", "deliverables": ["Something"]}
         client, _ = _client_returning(json.dumps(partial))
         with mock.patch.object(ai, "get_client", return_value=client):
             with self.assertRaises(ai.GigsieAIError) as ctx:

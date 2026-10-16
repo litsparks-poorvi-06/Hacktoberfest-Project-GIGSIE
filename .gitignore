@@ -5,4 +5,7 @@ __pycache__/
 .streamlit/secrets.toml
 data/gigs.json
 data/applications.json
+data/profiles.json
+data/assessments.json
+data/interviews.json
 data/*.tmp

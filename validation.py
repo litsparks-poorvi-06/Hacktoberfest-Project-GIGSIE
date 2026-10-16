@@ -242,6 +242,7 @@ def get_deliverables(gig: Any) -> list[str]:
         _as_string_list(gig.get("proposed_deliverables"))
         or _as_string_list(gig.get("deliverables"))
         or _as_string_list(_brief_of(gig).get("proposed_deliverables"))
+        or _as_string_list(_brief_of(gig).get("deliverables"))
     )
 
 

@@ -13,6 +13,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 # Make sure the project root is importable when tests are run from anywhere.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -99,6 +100,38 @@ class StorageTests(unittest.TestCase):
         storage.add_gig({"title": "Check file"}, self.data_dir)
         written = json.loads((self.data_dir / "gigs.json").read_text(encoding="utf-8"))
         self.assertIsInstance(written, list)
+
+    # --- write robustness (transient Windows file locks) -------------------
+    def test_write_survives_a_transient_replace_permission_error(self) -> None:
+        # Windows can briefly refuse os.replace while something holds the target
+        # open; a single transient error must not lose the save.
+        real_replace = storage.os.replace
+        calls = {"count": 0}
+
+        def flaky_replace(src, dst):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise PermissionError(5, "Access is denied")
+            return real_replace(src, dst)
+
+        with mock.patch.object(storage.os, "replace", side_effect=flaky_replace):
+            storage.save_gigs([{"id": "g_1", "title": "Saved"}], self.data_dir)
+
+        self.assertEqual(storage.load_gigs(self.data_dir), [{"id": "g_1", "title": "Saved"}])
+        self.assertGreaterEqual(calls["count"], 2)
+
+    def test_write_gives_up_after_persistent_permission_errors(self) -> None:
+        with mock.patch.object(
+            storage.os, "replace", side_effect=PermissionError(5, "Access is denied")
+        ):
+            with self.assertRaises(storage.StorageError):
+                storage.save_gigs([{"id": "g_1"}], self.data_dir)
+        # A failed save never leaves a half-written target behind.
+        self.assertFalse((self.data_dir / "gigs.json").exists())
+
+    def test_no_temporary_file_is_left_behind(self) -> None:
+        storage.save_gigs([{"id": "g_1"}], self.data_dir)
+        self.assertEqual(list(self.data_dir.glob("*.tmp")), [])
 
 
 if __name__ == "__main__":

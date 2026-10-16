@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,11 @@ from typing import Any
 # The real data folder lives next to this file.
 DATA_DIR = Path(__file__).resolve().parent / "data"
 SAMPLES_FILE = DATA_DIR / "sample_gigs.json"
+
+# How hard to try when Windows briefly refuses to replace a file (see
+# ``_write_json``). The delay grows a little with each attempt.
+_SAVE_ATTEMPTS = 4
+_SAVE_RETRY_DELAY_SECONDS = 0.03
 
 
 class StorageError(Exception):
@@ -41,6 +47,11 @@ class StorageError(Exception):
 def _now() -> str:
     """Return the current UTC time as text, e.g. 2026-10-15T09:00:00+00:00."""
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def now_iso() -> str:
+    """Public helper: current UTC time as text, matching the stored format."""
+    return _now()
 
 
 def _gigs_path(data_dir: Path | None) -> Path:
@@ -75,16 +86,54 @@ def _read_json(path: Path) -> Any:
         raise StorageError(f"The file '{path.name}' could not be opened.") from error
 
 
+def _discard(path: Path) -> None:
+    """Remove a temporary file, ignoring the case where it is already gone."""
+    try:
+        path.unlink()
+    except OSError:
+        pass
+
+
 def _write_json(path: Path, data: Any) -> None:
-    """Write JSON safely: write to a temp file, then replace the target."""
+    """Write JSON safely: write to a temp file, then replace the target.
+
+    Two small robustness details matter on Windows:
+
+    * The temporary file gets a **unique** name. The old code always wrote to
+      ``<file>.tmp``; if two writers touched the same collection at once they
+      could collide and one would fail to save.
+    * ``os.replace`` is atomic, but Windows can briefly refuse it with a
+      permission error while an indexer or another reader holds the target open.
+      We retry a few times instead of failing a save outright.
+    """
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        temp_path = path.with_suffix(path.suffix + ".tmp")
-        with temp_path.open("w", encoding="utf-8") as handle:
-            json.dump(data, handle, indent=2, ensure_ascii=False)
-        os.replace(temp_path, path)
     except OSError as error:
         raise StorageError(f"The file '{path.name}' could not be saved.") from error
+
+    temp_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with temp_path.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle, indent=2, ensure_ascii=False)
+    except OSError as error:
+        _discard(temp_path)
+        raise StorageError(f"The file '{path.name}' could not be saved.") from error
+
+    last_error: OSError | None = None
+    for attempt in range(_SAVE_ATTEMPTS):
+        try:
+            os.replace(temp_path, path)
+        except PermissionError as error:  # usually a transient Windows file lock
+            last_error = error
+            time.sleep(_SAVE_RETRY_DELAY_SECONDS * (attempt + 1))
+        except OSError as error:
+            last_error = error
+            break
+        else:
+            return
+
+    _discard(temp_path)
+    raise StorageError(f"The file '{path.name}' could not be saved.") from last_error
 
 
 def _expect_list(data: Any, path: Path) -> list[dict]:
@@ -179,6 +228,15 @@ def load_applications(data_dir: Path | None = None) -> list[dict[str, Any]]:
     return _expect_list(data, path)
 
 
+def save_applications(
+    applications: list[dict[str, Any]], data_dir: Path | None = None
+) -> None:
+    """Overwrite the applications file with ``applications``."""
+    if not isinstance(applications, list):
+        raise StorageError("Applications must be provided as a list.")
+    _write_json(_applications_path(data_dir), applications)
+
+
 def save_application(
     application: dict[str, Any], data_dir: Path | None = None
 ) -> dict[str, Any]:
@@ -191,3 +249,67 @@ def save_application(
     applications.append(record)
     _write_json(_applications_path(data_dir), applications)
     return record
+
+
+# ---------------------------------------------------------------------------
+# Generic single-file collections (profiles, assessments, interviews)
+# ---------------------------------------------------------------------------
+# Each collection is a JSON list of objects in its own file inside data/, so the
+# existing gigs and applications files keep their shape and existing tests keep
+# working. A missing file simply means "nothing saved yet".
+def _collection_path(name: str, data_dir: Path | None) -> Path:
+    return (data_dir or DATA_DIR) / f"{name}.json"
+
+
+def load_collection(name: str, data_dir: Path | None = None) -> list[dict[str, Any]]:
+    """Return every item in the named collection. A missing file returns []."""
+    path = _collection_path(name, data_dir)
+    data = _read_json(path)
+    if data is None:
+        return []
+    return _expect_list(data, path)
+
+
+def save_collection(
+    name: str, items: list[dict[str, Any]], data_dir: Path | None = None
+) -> None:
+    """Overwrite the named collection with ``items`` (a list of objects)."""
+    if not isinstance(items, list):
+        raise StorageError(f"The '{name}' collection must be provided as a list.")
+    _write_json(_collection_path(name, data_dir), items)
+
+
+def load_profiles(data_dir: Path | None = None) -> list[dict[str, Any]]:
+    """Return every locally saved student profile."""
+    return load_collection("profiles", data_dir)
+
+
+def save_profiles(
+    profiles: list[dict[str, Any]], data_dir: Path | None = None
+) -> None:
+    """Overwrite the profiles collection."""
+    save_collection("profiles", profiles, data_dir)
+
+
+def load_assessments(data_dir: Path | None = None) -> list[dict[str, Any]]:
+    """Return every stored practice-assessment result."""
+    return load_collection("assessments", data_dir)
+
+
+def save_assessments(
+    results: list[dict[str, Any]], data_dir: Path | None = None
+) -> None:
+    """Overwrite the assessment-results collection."""
+    save_collection("assessments", results, data_dir)
+
+
+def load_interviews(data_dir: Path | None = None) -> list[dict[str, Any]]:
+    """Return every stored interview record."""
+    return load_collection("interviews", data_dir)
+
+
+def save_interviews(
+    interviews: list[dict[str, Any]], data_dir: Path | None = None
+) -> None:
+    """Overwrite the interviews collection."""
+    save_collection("interviews", interviews, data_dir)
