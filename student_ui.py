@@ -20,6 +20,7 @@ modules (``profiles.py``, ``applications.py``, ``assessments.py``, ``validation.
 from __future__ import annotations
 
 from datetime import datetime
+from html import escape as _escape
 from typing import Any
 
 import streamlit as st
@@ -35,16 +36,43 @@ import profiles
 import storage
 import ui_common
 import validation
+import voice_narration
 
 
 # ---------------------------------------------------------------------------
 # Small guards and helpers
 # ---------------------------------------------------------------------------
 def _top_bar() -> None:
+    """Kept for compatibility: the back control now lives in the page header."""
     col_back, _ = st.columns([1, 5])
     with col_back:
         if st.button("← Back to start", key="student_back_to_landing"):
-            ui_common.go(ui_common.VIEW_HOME)
+            ui_common.go(ui_common.VIEW_HOME, ui_common.SEC_OVERVIEW)
+
+
+def _student_header(section: str) -> None:
+    """Compact top header for every student page.
+
+    The profile area shows the real local profile - never an invented avatar,
+    name, or notification count.
+    """
+    active = _active_profile()
+    name = str(active.get("display_name") or "") if active else ""
+    sub = f"Student profile · {active.get('id')}" if active else ""
+    ui_common.top_header(
+        crumb=["Student", ui_common.SECTION_LABEL.get(section, "Student overview")],
+        role=ui_common.ROLE_STUDENT,
+        back_key="student_back_to_landing",
+        profile_name=name,
+        profile_sub=sub,
+        primary_label="Find Work",
+        primary_target=(ui_common.VIEW_STUDENT, ui_common.SEC_FIND_WORK),
+    )
+
+
+def _section_jump(current: str) -> None:
+    """Deprecated: the sidebar is the single navigation, so no in-page jump bar."""
+    return
 
 
 def _active_profile() -> dict[str, Any] | None:
@@ -175,11 +203,13 @@ def _render_profile_checklist(profile: dict[str, Any] | None) -> None:
 # Profile tab
 # ---------------------------------------------------------------------------
 def render_profile_tab() -> None:
-    st.markdown("#### Your student profile")
-    st.info(
-        "Profiles are saved **locally on this device**. This prototype has **no real "
-        "accounts, passwords, or authentication**, and the skills you list are "
-        "**self-reported** - Gigsie does not verify them."
+    ui_common.section_heading(
+        "Your student profile",
+        "Self-reported skills and details saved on this device only.",
+    )
+    st.caption(
+        "There are no real accounts, passwords, or authentication here. The skills you "
+        "list are self-reported and Gigsie does not verify them."
     )
 
     flash = st.session_state.pop("student_profile_flash", None)
@@ -320,7 +350,10 @@ def _render_profile_form(active: dict[str, Any] | None) -> None:
 # Browse gigs tab
 # ---------------------------------------------------------------------------
 def render_browse_tab() -> None:
-    st.markdown("#### Browse published gigs")
+    ui_common.section_heading(
+        "Browse published gigs",
+        "Published first, labelled samples last.",
+    )
 
     try:
         gigs = storage.load_gigs()
@@ -334,16 +367,13 @@ def render_browse_tab() -> None:
 
     if not ordered:
         st.info(
-            "No gigs are available yet. When a business publishes a gig it will appear "
-            "here automatically."
+            "No gigs are available yet. A business can create one in the **Business** "
+            "area; once it is published, it will appear here automatically."
         )
         return
 
-    st.markdown(
-        "Only **published** gigs are shown. Entries marked "
-        f"{ui_common.sample_tag()} are example data shipped with Gigsie - "
-        "they are not real businesses or real requests.",
-        unsafe_allow_html=True,
+    st.caption(
+        "Sample gigs stay labelled SAMPLE and cannot be applied for."
     )
 
     profile = _active_profile()
@@ -353,66 +383,125 @@ def render_browse_tab() -> None:
             "match each gig."
         )
 
-    _render_gig_cards(ordered)
+    _render_gig_cards(ordered, profile)
 
     display: list[str] = []
     for gig in ordered:
         tag = " [SAMPLE]" if gig.get("sample") else ""
-        title = gig.get("title") or "Untitled gig"
+        title = ui_common.gig_title(gig)
         display.append(f"{title}{tag} · {gig.get('id')}")
 
-    choice = st.selectbox("Choose a gig to view", display)
+    selected_id = st.session_state.get("student_selected_gig")
+    index = 0
+    if selected_id:
+        ids = [str(gig.get("id")) for gig in ordered]
+        if selected_id in ids:
+            index = ids.index(selected_id)
+
+    choice = st.selectbox(
+        "Choose a gig to view", display, index=index, key="student_gig_choice"
+    )
     gig = ordered[display.index(choice)]
+    st.session_state["student_selected_gig"] = gig.get("id")
 
     _render_gig_detail(gig, profile)
 
 
-def _render_gig_cards(gigs: list[dict[str, Any]]) -> None:
-    """A scannable grid of the expected work, budget, deadline, and skills."""
+def _match_line(gig: dict[str, Any], profile: dict[str, Any] | None) -> str:
+    """A real, deterministic match summary - never estimated by the model."""
+    if not profile:
+        return ""
+    match = validation.match_gig_to_skills(gig, profile)
+    parts: list[str] = []
+    if match["score"] is not None:
+        parts.append(f"Skill match {match['score']}%")
+    if match["matched"]:
+        parts.append("you list " + ", ".join(match["matched"]))
+    if match["missing"]:
+        parts.append("not in your profile: " + ", ".join(match["missing"]))
+    return " · ".join(parts)
+
+
+def _render_gig_cards(gigs: list[dict[str, Any]], profile: dict[str, Any] | None) -> None:
+    """A scannable grid of gig cards, each with a real 'View Gig' action."""
     if not gigs:
         return
-    columns = st.columns(2)
-    for index, gig in enumerate(gigs):
-        with columns[index % 2]:
-            tag = " " + ui_common.sample_tag() if gig.get("sample") else ""
-            title = gig.get("title") or "Untitled gig"
-            objective = _gig_objective(gig) or "No objective was provided."
-            skills = validation.get_required_skills(gig)
-            skill_chips = "".join(ui_common.chip(skill, "info") for skill in skills)
-            if not skill_chips:
-                skill_chips = ui_common.chip("No skills listed", "neutral")
-            st.markdown(
-                f'<div class="gs-card"><h4>{title}{tag}</h4>'
-                f"<p>{objective}</p>"
-                f'<p><strong>{_budget_text(gig)}</strong> · '
-                f"{gig.get('deadline') or 'No deadline'}</p>"
-                f"{skill_chips}</div>",
-                unsafe_allow_html=True,
-            )
+    ordered = _order_gigs(gigs, profile)
+    for start in range(0, len(ordered), 2):
+        columns = st.columns(2, gap="medium")
+        for offset, gig in enumerate(ordered[start : start + 2]):
+            with columns[offset]:
+                st.markdown(
+                    ui_common.gig_card(
+                        gig,
+                        description=str(gig.get("desired_outcome") or "")
+                        or ui_common.gig_objective(gig),
+                        meta_right=str(gig.get("created_at") or "")[:10],
+                        match_line=_match_line(gig, profile),
+                        fill=True,
+                    ),
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    "View Gig",
+                    key=f"student_view_{gig.get('id')}",
+                    use_container_width=True,
+                ):
+                    st.session_state["student_selected_gig"] = gig.get("id")
+                    st.rerun()
+
+
+def _order_gigs(
+    gigs: list[dict[str, Any]], profile: dict[str, Any] | None
+) -> list[dict[str, Any]]:
+    """Use the existing deterministic ranking so better matches surface first."""
+    if not profile:
+        return gigs
+    try:
+        ranked = validation.rank_gigs(gigs, profile)
+    except Exception:  # pragma: no cover - ranking is advisory only
+        return gigs
+    return [item["gig"] for item in ranked if isinstance(item, dict) and "gig" in item]
 
 
 def _render_gig_detail(gig: dict[str, Any], profile: dict[str, Any] | None) -> None:
-    title = gig.get("title") or "Untitled gig"
-    heading = f"### {title}"
+    title = ui_common.gig_title(gig)
     if gig.get("sample"):
-        st.markdown(heading + " " + ui_common.sample_tag(), unsafe_allow_html=True)
+        st.markdown(f"### {title} " + ui_common.sample_tag(), unsafe_allow_html=True)
     else:
-        st.markdown(heading)
+        st.markdown(f"### {title}")
 
-    facts: list[str] = []
-    if gig.get("business_name"):
-        facts.append(f"**Business:** {gig.get('business_name')}")
-    facts.append(f"**Budget:** {_budget_text(gig)}")
-    facts.append(f"**Deadline:** {gig.get('deadline') or 'Not specified'}")
-    st.markdown(" · ".join(facts))
+    pairs = [("Business", ui_common.gig_context(gig))]
+    if gig.get("id"):
+        pairs.append(("Gig ID", str(gig.get("id"))))
+    pairs.append(("Budget", ui_common.gig_budget(gig)))
+    pairs.append(("Deadline", str(gig.get("deadline") or "Not specified")))
+    ui_common.panel(
+        "Gig summary",
+        "Everything below comes from the published gig record",
+        body=ui_common.key_values(pairs),
+        tags=ui_common.tags(ui_common.gig_skills(gig)),
+        fill=True,
+    )
+    ui_common.voice_brief(
+        label="Listen to this Gig Passport",
+        text=voice_narration.build_passport_narration(gig=gig),
+        key=f"voice_gig_{gig.get('id')}",
+        caption="A spoken summary of the agreed scope above - the same text, out loud.",
+    )
 
     objective = _gig_objective(gig)
     if objective:
         st.markdown("**Objective**")
         st.write(objective)
 
+    outcome = str(gig.get("desired_outcome") or "").strip()
+    if outcome and outcome != objective:
+        st.markdown("**Outcome the business wants**")
+        st.write(outcome)
+
     work_needed = str(gig.get("work_needed") or "").strip()
-    if work_needed and work_needed != objective:
+    if work_needed and work_needed not in (objective, outcome):
         st.markdown("**What the business needs**")
         st.write(work_needed)
 
@@ -489,6 +578,12 @@ def _render_match_block(gig: dict[str, Any], profile: dict[str, Any] | None) -> 
         st.markdown(
             "**Required skills not listed in your profile:** " + ", ".join(match["missing"])
         )
+    if profile and not _as_list(profile.get("skills")):
+        st.info(
+            "Your profile lists no skills yet, so no match score can be calculated. "
+            "Add the skills you honestly have in the **Profile** tab to see how you line "
+            "up with this gig."
+        )
 
     st.markdown("**Why this result**")
     for reason in match["reasons"]:
@@ -501,6 +596,42 @@ def _render_match_block(gig: dict[str, Any], profile: dict[str, Any] | None) -> 
 # ---------------------------------------------------------------------------
 # Apply section (inside the browse tab, for the selected gig)
 # ---------------------------------------------------------------------------
+def _render_proposal_brief(gig: dict[str, Any], profile: dict[str, Any]) -> None:
+    """Remind the student what this gig needs before they write the proposal.
+
+    Shows the gig's own objective, deliverables, and required skills, plus the
+    skills the profile already lists and any it does not - computed in Python,
+    never invented.
+    """
+    objective = _gig_objective(gig)
+    deliverables = validation.get_deliverables(gig)
+    required = validation.get_required_skills(gig)
+    match = validation.match_gig_to_skills(gig, profile)
+
+    with st.container(border=True):
+        st.markdown("##### What this gig needs")
+        if objective:
+            st.markdown(f"**Objective:** {objective}")
+        st.markdown("**Deliverables**")
+        ui_common.bullet_list(deliverables, "No deliverables listed.")
+        st.markdown("**Skills the business requires**")
+        ui_common.bullet_list(required, "No specific skills listed.")
+        if match["matched"]:
+            st.markdown(
+                "**Your profile lists:** " + ", ".join(match["matched"])
+            )
+        if match["missing"]:
+            st.markdown(
+                "**Not in your profile (address these or ask):** "
+                + ", ".join(match["missing"])
+            )
+        st.caption(
+            "Explain which of your skills are relevant, how you would approach the work, "
+            "and anything you need clarified. Only describe experience you actually have "
+            "- the business reads this proposal directly."
+        )
+
+
 def _render_apply_section(gig: dict[str, Any], profile: dict[str, Any] | None) -> None:
     st.markdown("#### Apply for this gig")
 
@@ -542,6 +673,7 @@ def _render_apply_section(gig: dict[str, Any], profile: dict[str, Any] | None) -
         _render_review_step(gig, profile, durable_key)
         return
 
+    _render_proposal_brief(gig, profile)
     st.caption(
         "Write a short proposal explaining why you fit this task. You can review it "
         "before you submit."
@@ -568,7 +700,10 @@ def _render_review_step(
     text = str(st.session_state.get(durable_key) or "").strip()
 
     st.markdown("##### Review your proposal")
-    st.caption("This is exactly what will be sent to the business.")
+    st.caption(
+        f"Applying for: **{gig.get('title') or 'Untitled gig'}**. This is exactly what "
+        "will be sent to the business."
+    )
     with st.container(border=True):
         st.write(text if text else "_(empty)_")
 
@@ -623,7 +758,10 @@ def _render_review_step(
 # My applications tab
 # ---------------------------------------------------------------------------
 def render_my_applications_tab() -> None:
-    st.markdown("#### Your applications")
+    ui_common.section_heading(
+        "Your applications",
+        "Proposals you submitted, with their current stored status.",
+    )
 
     profile = _active_profile()
     if not profile:
@@ -727,7 +865,10 @@ def _started_datetime() -> datetime | None:
 
 
 def render_assessments_tab() -> None:
-    st.markdown("#### Skill assessments")
+    ui_common.section_heading(
+        "Skill assessments",
+        "AI-generated practice questions, graded locally in Python.",
+    )
     st.info(
         "Short **AI-generated practice** assessments for one skill. They are **not a "
         "certification** and are **not verified**. Your score is calculated in Python "
@@ -1160,7 +1301,10 @@ def _render_student_interview_card(
 
 
 def render_interviews_tab() -> None:
-    st.markdown("#### Interviews")
+    ui_common.section_heading(
+        "Interviews",
+        "Only the stored status - no video calls, emails, or calendar invites.",
+    )
     st.info(
         "Interview coordination here is only the **stored status**: the two sides agree "
         "on a time (and optionally a meeting link). Gigsie does **not** host video calls, "
@@ -1208,42 +1352,275 @@ def render_interviews_tab() -> None:
         _render_student_interview_card(interview, profile)
 
 
+def _student_overview(profile: dict[str, Any] | None) -> None:
+    """A compact, honest dashboard shown above the student sections.
+
+    Every figure comes from locally saved data. It deliberately uses cards rather
+    than metrics, so a missing value is never dressed up as a score.
+    """
+    available: int | str = "—"
+    try:
+        available = len(storage.load_gigs())
+    except storage.StorageError:
+        available = "—"
+
+    submitted: int | str = "—"
+    pending: int | str = "—"
+    latest: dict[str, Any] | None = None
+    if profile:
+        try:
+            submitted = len(applications.applications_for_profile(profile.get("id")))
+        except storage.StorageError:
+            submitted = "—"
+        try:
+            mine = interviews.interviews_for_profile(profile.get("id"))
+            pending = sum(
+                1
+                for interview in mine
+                if interview.get("status")
+                in (
+                    interviews.INTERVIEW_REQUESTED,
+                    interviews.INTERVIEW_ALTERNATIVE_PROPOSED,
+                )
+            )
+        except storage.StorageError:
+            pending = "—"
+        try:
+            results = assessments.results_for_profile(profile.get("id"))
+            latest = results[-1] if results else None
+        except storage.StorageError:
+            latest = None
+
+    columns = st.columns(4)
+    with columns[0]:
+        ui_common.stat_card("Gigs available", str(available), "Published and sample gigs")
+    with columns[1]:
+        ui_common.stat_card(
+            "Your applications", str(submitted), "Submitted from this profile", tone="info"
+        )
+    with columns[2]:
+        ui_common.stat_card(
+            "Interviews to answer", str(pending), "Requests needing your reply", tone="warn"
+        )
+    with columns[3]:
+        if latest:
+            ui_common.stat_card(
+                "Latest practice",
+                f"{latest.get('score')}/{latest.get('max_score')}",
+                f"{latest.get('skill') or 'Skill'} · {latest.get('percent')}%",
+            )
+        else:
+            ui_common.stat_card("Latest practice", "—", "No practice results saved yet")
+
+    left, middle, right = st.columns([1, 1.1, 1], gap="medium")
+    with left:
+        if profile:
+            skills = _as_list(profile.get("skills"))
+            ui_common.module_card(
+                f"Hello, {str(profile.get('display_name') or 'student')}",
+                "Skills are self-reported",
+                body="",
+                tags=(
+                    ui_common.skill_tags(skills[:5])
+                    if skills
+                    else ui_common.chip("No skills listed yet", "warn")
+                ),
+                fill=True,
+            )
+        else:
+            ui_common.module_card(
+                "Start with a profile",
+                "Required before you can apply",
+                body="",
+                tags=ui_common.tags(["Name", "Skills", "Availability"]),
+                fill=True,
+            )
+        if st.button(
+            "Open profile",
+            key="student_overview_profile",
+            use_container_width=True,
+        ):
+            ui_common.go(ui_common.VIEW_STUDENT, ui_common.SEC_PROFILE)
+
+    with middle:
+        _matched_opportunities_card(profile)
+
+    with right:
+        _student_activity_card(profile, latest)
+
+
+def _matched_opportunities_card(profile: dict[str, Any] | None) -> None:
+    """Real, deterministically ranked gigs - no invented matches."""
+    try:
+        gigs = storage.load_gigs()
+    except storage.StorageError:
+        gigs = []
+
+    if not gigs:
+        ui_common.module_card(
+            "AI-matched opportunities",
+            "No gigs saved yet",
+            body="<p>Nothing has been published on this device.</p>",
+            fill=True,
+        )
+        return
+
+    ranked = _order_gigs(gigs, profile)[:3]
+    rows = []
+    for gig in ranked:
+        match = validation.match_gig_to_skills(gig, profile or {})
+        detail = (
+            f"Skill match {match['score']}%"
+            if match["score"] is not None
+            else "No score - add skills to your profile"
+        )
+        rows.append(
+            "<div>"
+            f"<b>{_escape(ui_common.gig_title(gig))} {ui_common.gig_badge(gig)}</b>"
+            f'<div class="muted">{_escape(ui_common.gig_budget(gig))} · {_escape(detail)}</div>'
+            "</div>"
+        )
+    ui_common.module_card(
+        "AI-matched opportunities",
+        f"{len(gigs)} gig(s) on this device",
+        body=ui_common.list_rows(rows),
+        tags=ui_common.tags(["Deterministic", "No invented scores"]),
+        fill=True,
+    )
+    if st.button("Open Find Work", key="student_overview_find", use_container_width=True):
+        ui_common.go(ui_common.VIEW_STUDENT, ui_common.SEC_FIND_WORK)
+
+
+def _student_activity_card(
+    profile: dict[str, Any] | None, latest: dict[str, Any] | None
+) -> None:
+    """Applications, interviews, and practice - all read from local storage."""
+    if not profile:
+        ui_common.module_card(
+            "Your activity",
+            "Needs a profile",
+            body="<p>Applications and interviews appear here once a profile is active.</p>",
+            fill=True,
+        )
+        if st.button(
+            "Create a profile",
+            key="student_activity_profile",
+            use_container_width=True,
+        ):
+            ui_common.go(ui_common.VIEW_STUDENT, ui_common.SEC_PROFILE)
+        return
+
+    rows: list[str] = []
+    try:
+        mine = applications.applications_for_profile(profile.get("id"))
+    except storage.StorageError:
+        mine = []
+    for application in list(reversed(mine))[:3]:
+        rows.append(
+            "<div>"
+            f"<b>{_escape(str(application.get('gig_title') or 'Untitled gig'))}</b>"
+            f'<div class="muted">Submitted {application.get("created_at") or "—"}</div></div>'
+            f"<div>{ui_common.status_pill(application.get('status'))}</div>"
+        )
+
+    try:
+        my_interviews = interviews.interviews_for_profile(profile.get("id"))
+    except storage.StorageError:
+        my_interviews = []
+    notes = [
+        f"{len(my_interviews)} interview request(s)" if my_interviews else "No interviews yet",
+        (
+            f"Practice: {latest.get('skill')} {latest.get('score')}/{latest.get('max_score')}"
+            if latest
+            else "No practice results yet"
+        ),
+    ]
+    ui_common.module_card(
+        "Your activity",
+        "Applications, interviews, practice",
+        body="".join(
+            [ui_common.list_rows(rows)] + [f"<p>{note}</p>" for note in notes]
+        ),
+        tags=ui_common.tags(["Practice, not certification"]),
+        fill=True,
+    )
+    if st.button(
+        "My applications",
+        key="student_activity_applications",
+        use_container_width=True,
+    ):
+        ui_common.go(ui_common.VIEW_STUDENT, ui_common.SEC_APPLICATIONS)
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
-def render_student() -> None:
-    """Render the whole student area. Called by app.py for the 'student' view."""
+_SECTION_RENDERERS = {
+    ui_common.SEC_PROFILE: render_profile_tab,
+    ui_common.SEC_FIND_WORK: render_browse_tab,
+    ui_common.SEC_APPLICATIONS: render_my_applications_tab,
+    ui_common.SEC_ASSESSMENTS: render_assessments_tab,
+    ui_common.SEC_INTERVIEWS: render_interviews_tab,
+}
+
+
+def render_student(section: str = "") -> None:
+    """Render the student area.
+
+    The sidebar is the only navigation. Each student destination is its own page,
+    so there is no second tab bar inside the page.
+    """
     ui_common.inject_styles()
-    _top_bar()
+    _student_header(section or ui_common.SEC_STUDENT_HOME)
 
-    st.subheader("🎓 Student area")
-    st.caption(
-        "Local prototype: your profile, applications, and practice results are stored on "
-        "this device only. There are no real accounts, logins, payments, or messaging."
+    if section and section in _SECTION_RENDERERS:
+        ui_common.page_header(
+            ui_common.SECTION_LABEL.get(section, "Student"),
+            _SECTION_SUBTITLES.get(section, ""),
+            eyebrow_text="Student",
+        )
+        _SECTION_RENDERERS[section]()
+        return
+
+    ui_common.page_header(
+        "Student Overview",
+        "Find work, read the agreed scope, and apply.",
+        eyebrow_text="For students",
     )
+    _student_overview(_active_profile())
+    _student_next_steps()
 
-    active = _active_profile()
-    if active:
-        st.markdown(
-            f"Active profile: **{active.get('display_name')}** (`{active.get('id')}`)"
+
+def _student_next_steps() -> None:
+    """Real next actions from the Overview, so nothing important is hidden."""
+    profile = _active_profile()
+    columns = st.columns(3, gap="medium")
+    with columns[0]:
+        if st.button(
+            "Find Work", type="primary", use_container_width=True, key="ov_find_work"
+        ):
+            ui_common.go(ui_common.VIEW_STUDENT, ui_common.SEC_FIND_WORK)
+    with columns[1]:
+        if st.button(
+            "Open My Profile", use_container_width=True, key="ov_profile"
+        ):
+            ui_common.go(ui_common.VIEW_STUDENT, ui_common.SEC_PROFILE)
+    with columns[2]:
+        if st.button(
+            "My Applications", use_container_width=True, key="ov_applications"
+        ):
+            ui_common.go(ui_common.VIEW_STUDENT, ui_common.SEC_APPLICATIONS)
+
+    if not profile:
+        st.caption(
+            "Create a profile first - matches and applications are linked to it."
         )
 
-    tab_profile, tab_browse, tab_apps, tab_assess, tab_interviews = st.tabs(
-        [
-            "👤 Profile",
-            "🔎 Browse gigs",
-            "📨 My applications",
-            "🧪 Skill assessments",
-            "🗓️ Interviews",
-        ]
-    )
-    with tab_profile:
-        render_profile_tab()
-    with tab_browse:
-        render_browse_tab()
-    with tab_apps:
-        render_my_applications_tab()
-    with tab_assess:
-        render_assessments_tab()
-    with tab_interviews:
-        render_interviews_tab()
+
+_SECTION_SUBTITLES = {
+    ui_common.SEC_PROFILE: "Self-reported. Saved on this device only.",
+    ui_common.SEC_FIND_WORK: "Published gigs matched against your real skills.",
+    ui_common.SEC_APPLICATIONS: "Your proposals and their stored status.",
+    ui_common.SEC_ASSESSMENTS: "AI practice questions, graded in Python.",
+    ui_common.SEC_INTERVIEWS: "Stored interview status only.",
+}

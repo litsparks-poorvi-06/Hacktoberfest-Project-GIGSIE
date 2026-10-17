@@ -155,17 +155,38 @@ class InterviewFlowTests(unittest.TestCase):
         self.assertFalse(at.exception)
         return at
 
+    @staticmethod
+    def _open_sidebar(at, label: str):
+        """Stage 9: each destination is its own sidebar page."""
+        wanted = "".join(ch for ch in label if ch.isalnum()).lower()
+        for button in at.sidebar.button:
+            text = "".join(ch for ch in button.label if ch.isalnum()).lower()
+            if text == wanted:
+                button.click().run()
+                return at
+        raise AssertionError(f"sidebar destination {label!r} was not found")
+
     def _open_business(self):
+        """Applicants & Interviews, where applicant management lives now."""
+        return self._open_sidebar(self._open("Start a business request"), "Applicants & Interviews")
+
+    def _open_create(self):
         return self._open("Start a business request")
 
     def _open_student(self):
         return self._open("Enter the student area")
 
-    def _open_student_with_profile(self):
+    def _open_student_with_profile(self, section: str = "Interviews"):
         at = self._open_student()
+        self._open_sidebar(at, "My Profile")
         _by_label(at.button, "Load this profile").click().run()
         self.assertFalse(at.exception)
+        self._open_sidebar(at, section)
+        self.assertFalse(at.exception)
         return at
+
+    def _open_find_work(self):
+        return self._open_student_with_profile(section="Find Work")
 
     def _seed_application(self, profile: dict | None = None, gig: dict | None = None) -> dict:
         return applications.submit_application(
@@ -221,6 +242,13 @@ class InterviewFlowTests(unittest.TestCase):
         self._seed_application()
         at = self._open_business()
         self.assertIn("https://example.com/asha", _page_text(at))
+
+    def test_business_review_shows_the_actual_saved_proposal(self) -> None:
+        # The applicant card must show the proposal the student actually wrote,
+        # not a summary or a generated one.
+        self._seed_application()
+        at = self._open_business()
+        self.assertIn(LONG_PROPOSAL, _page_text(at))
 
     def test_business_section_when_there_are_no_applications(self) -> None:
         at = self._open_business()
@@ -514,6 +542,7 @@ class InterviewFlowTests(unittest.TestCase):
     def test_student_interviews_require_a_profile(self) -> None:
         self._seed_interview()
         at = self._open_student()
+        self._open_sidebar(at, "Interviews")
         self.assertNotIn("Accept this time", _labels(at))
         self.assertTrue(
             any("Create or load a profile first" in i.value for i in at.info)
@@ -543,38 +572,47 @@ class InterviewFlowTests(unittest.TestCase):
         self.assertTrue(any("could not be read" in e.value for e in at.error))
 
     def test_student_interviews_view_is_offered_alongside_the_others(self) -> None:
-        at = self._open_student_with_profile()
-        labels = [tab.label for tab in at.tabs]
-        self.assertEqual(len(labels), 5, labels)
+        at = self._open_student()
+        # Stage 9: the sidebar is the only navigation, so there is no tab bar.
+        self.assertEqual([tab.label for tab in at.tabs], [])
+
+        labels = [button.label for button in at.sidebar.button]
         for expected in (
-            "Profile",
-            "Browse gigs",
-            "My applications",
-            "Skill assessments",
+            "Student Overview",
+            "Find Work",
+            "My Profile",
+            "My Applications",
+            "Skill Assessments",
             "Interviews",
         ):
-            self.assertTrue(any(expected in label for label in labels), labels)
-        # The existing sections still render their content too.
-        text = _page_text(at)
-        self.assertIn("Your student profile", text)
-        self.assertIn("Skill assessments", text)
+            self.assertTrue(
+                any(expected in label for label in labels), f"{expected!r} missing"
+            )
+
+        # Each destination still renders its own real content.
+        self._open_sidebar(at, "My Profile")
+        self.assertIn("Your student profile", _page_text(at))
+        self._open_sidebar(at, "Skill Assessments")
+        self.assertIn("Skill assessments", _page_text(at))
 
     # -----------------------------------------------------------------------
     # Existing workflows keep working, and assessments never block anything
     # -----------------------------------------------------------------------
     def test_assessments_are_still_accessible(self) -> None:
-        at = self._open_student_with_profile()
+        at = self._open_student_with_profile(section="Skill Assessments")
         self.assertIn("Generate practice assessment", _labels(at))
 
     def test_assessment_is_not_required_before_applying(self) -> None:
-        at = self._open_student_with_profile()
+        at = self._open_find_work()
         self._apply(at)
         self.assertEqual(len(self._applications()), 1)
         self.assertEqual(storage.load_assessments(self.data_dir), [])
+        self._open_sidebar(at, "My Applications")
         self.assertIn("Submitted", _page_text(at))
 
     def test_existing_student_profile_flow_still_works(self) -> None:
         at = self._open_student()
+        self._open_sidebar(at, "My Profile")
         _by_label(at.text_input, "Display name *").set_value("Neha Iyer")
         _by_label(at.text_area, "Skills (one per line) *").set_value("Figma")
         _by_label(
@@ -587,12 +625,13 @@ class InterviewFlowTests(unittest.TestCase):
         self.assertTrue(any(p["display_name"] == "Neha Iyer" for p in saved))
 
     def test_existing_student_applications_view_still_works(self) -> None:
-        at = self._open_student_with_profile()
+        at = self._open_find_work()
         self._apply(at)
+        self._open_sidebar(at, "My Applications")
         self.assertIn("Submitted", _page_text(at))
 
     def test_existing_business_flow_still_works(self) -> None:
-        at = self._open_business()
+        at = self._open_create()
         at.text_input[0].set_value("Sunrise Bakery")
         at.text_area[0].set_value("Promote our new seasonal menu on Instagram.")
         at.text_area[1].set_value("More local customers visit the shop.")
@@ -600,6 +639,7 @@ class InterviewFlowTests(unittest.TestCase):
         at.text_input[1].set_value("2 days")
         _by_label(at.button, "Generate task brief").click().run()
         self.assertFalse(at.exception)
+        _by_label(at.button, "Continue to the Gig Passport").click().run()
         _by_label(at.button, "Publish gig").click().run()
         self.assertFalse(at.exception)
 
@@ -611,7 +651,7 @@ class InterviewFlowTests(unittest.TestCase):
 
     def test_student_can_move_between_business_and_student_views(self) -> None:
         at = self._open_student()
-        _by_label(at.button, "← Back to start").click().run()
+        _open_sidebar(at, "Overview")
         self.assertFalse(at.exception)
         _by_label(at.button, "Start a business request").click().run()
         self.assertFalse(at.exception)

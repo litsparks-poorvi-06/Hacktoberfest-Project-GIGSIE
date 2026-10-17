@@ -112,13 +112,27 @@ class AssessmentFlowTests(unittest.TestCase):
 
         self.profile = profiles.save_profile(PROFILE_VALUES, data_dir=self.data_dir)
 
-    def _open_student_with_profile(self):
+    @staticmethod
+    def _open_section(at, label: str):
+        """Stage 9: each student section is its own sidebar page."""
+        wanted = "".join(ch for ch in label if ch.isalnum()).lower()
+        for button in at.sidebar.button:
+            text = "".join(ch for ch in button.label if ch.isalnum()).lower()
+            if text == wanted:
+                button.click().run()
+                return at
+        raise AssertionError(f"sidebar destination {label!r} was not found")
+
+    def _open_student_with_profile(self, section: str = "Skill Assessments"):
         at = AppTest.from_file(str(APP_PATH), default_timeout=30)
         at.run()
         self.assertFalse(at.exception)
         _by_label(at.button, "Enter the student area").click().run()
         self.assertFalse(at.exception)
+        self._open_section(at, "My Profile")
         _by_label(at.button, "Load this profile").click().run()
+        self.assertFalse(at.exception)
+        self._open_section(at, section)
         self.assertFalse(at.exception)
         return at
 
@@ -250,7 +264,7 @@ class AssessmentFlowTests(unittest.TestCase):
             data_dir=self.data_dir,
         )
         with mock.patch.object(gigsie_ai, "generate_assessment", return_value=GENERATED):
-            at = self._open_student_with_profile()
+            at = self._open_student_with_profile(section="Find Work")
         self.assertIn("Review proposal", [b.label for b in at.button])
 
 

@@ -19,6 +19,7 @@ guess which clock a time refers to.
 
 from __future__ import annotations
 
+from html import escape as _escape
 from typing import Any
 
 import streamlit as st
@@ -76,23 +77,22 @@ def _render_student_profile(profile_id: Any) -> None:
         st.caption("The student's saved local profile is no longer available.")
         return
 
-    with st.expander("Student profile"):
-        st.markdown(f"**{profile.get('display_name') or 'Unnamed student'}**")
-        skills = profile.get("skills") or []
-        if skills:
-            st.markdown("**Skills:** " + ", ".join(str(skill) for skill in skills))
-        if profile.get("experience_level"):
-            st.caption(f"Experience level: {profile.get('experience_level')}")
-        if profile.get("bio"):
-            st.write(profile.get("bio"))
-        links = profile.get("portfolio_links") or []
-        if links:
-            st.markdown("**Portfolio:** " + ", ".join(str(link) for link in links))
-        if profile.get("available_time"):
-            st.caption(f"Availability: {profile.get('available_time')}")
-        elif profile.get("weekly_hours") is not None:
-            st.caption(f"Availability: {profile.get('weekly_hours')} hrs/week")
-        st.caption("Self-reported by the student. Gigsie does not verify profiles.")
+    st.markdown(f"**{profile.get('display_name') or 'Unnamed student'}**")
+    skills = profile.get("skills") or []
+    if skills:
+        st.markdown("**Skills:** " + ", ".join(str(skill) for skill in skills))
+    if profile.get("experience_level"):
+        st.caption(f"Experience level: {profile.get('experience_level')}")
+    if profile.get("bio"):
+        st.write(profile.get("bio"))
+    links = profile.get("portfolio_links") or []
+    if links:
+        st.markdown("**Portfolio:** " + ", ".join(str(link) for link in links))
+    if profile.get("available_time"):
+        st.caption(f"Availability: {profile.get('available_time')}")
+    elif profile.get("weekly_hours") is not None:
+        st.caption(f"Availability: {profile.get('weekly_hours')} hrs/week")
+    st.caption("Self-reported by the student. Gigsie does not verify profiles.")
 
 
 # ---------------------------------------------------------------------------
@@ -177,67 +177,67 @@ def _render_applicant_card(application: dict[str, Any], gig: dict[str, Any]) -> 
     app_id = application.get("id")
     status = application.get("status")
 
-    with st.container(border=True):
-        st.markdown(f"**{application.get('student_name') or 'Unnamed student'}**")
-        st.markdown(
-            ui_common.status_pill(status, applications.STATUS_LABELS.get(status, status)),
-            unsafe_allow_html=True,
-        )
-        st.caption(
-            f"Application ID: {app_id} · Gig: {gig.get('title') or 'Untitled gig'} "
-            f"({gig.get('id')}) · Applied: {application.get('created_at')}"
-        )
+    ui_common.panel(
+        f"{application.get('student_name') or 'Unnamed student'}",
+        f"{gig.get('title') or 'Untitled gig'} · applied {application.get('created_at')}",
+        body=(
+            f"<div>{ui_common.status_pill(status, applications.STATUS_LABELS.get(status, status))}</div>"
+            f'<p class="gs-note">Application ID {_escape(str(app_id))}</p>'
+        ),
+        tags=ui_common.tags(ui_common.gig_skills(gig), limit=4),
+    )
 
-        with st.expander("Proposal"):
-            st.write(application.get("proposal") or "_(no proposal text saved)_")
+    with st.expander("Proposal"):
+        st.write(application.get("proposal") or "_(no proposal text saved)_")
 
+    with st.expander("Student profile"):
         _render_student_profile(application.get("profile_id"))
 
-        try:
-            existing = interviews.active_interview_for_application(app_id)
-        except storage.StorageError as error:
-            st.error(f"This applicant's interviews could not be read: {error}")
-            return
+    try:
+        existing = interviews.active_interview_for_application(app_id)
+    except storage.StorageError as error:
+        st.error(f"This applicant's interviews could not be read: {error}")
+        return
 
-        if existing:
-            istatus = existing.get("status")
-            st.caption(
-                "Interview: "
-                f"**{interviews.INTERVIEW_STATUS_LABELS.get(istatus, istatus)}** — "
-                "manage it under 'Interview requests & responses' above."
-            )
-        elif status in (applications.STATUS_SUBMITTED, applications.STATUS_SHORTLISTED):
-            _render_request_interview_form(application)
-        elif status == applications.STATUS_REJECTED:
-            st.caption("This application was rejected.")
-        else:
-            st.caption("No open interview for this application.")
+    if existing:
+        istatus = existing.get("status")
+        st.caption(
+            "Interview: "
+            f"**{interviews.INTERVIEW_STATUS_LABELS.get(istatus, istatus)}** — "
+            "manage it under 'Interview requests & responses' above."
+        )
+    elif status in (applications.STATUS_SUBMITTED, applications.STATUS_SHORTLISTED):
+        _render_request_interview_form(application)
+    elif status == applications.STATUS_REJECTED:
+        st.caption("This application was rejected.")
+    else:
+        st.caption("No open interview for this application.")
 
-        if status not in applications.TERMINAL_STATUSES:
-            col_shortlist, col_reject = st.columns(2)
-            with col_shortlist:
-                if st.button(
-                    "Shortlist",
-                    key=f"biz_shortlist_{app_id}",
-                    use_container_width=True,
-                    disabled=(status == applications.STATUS_SHORTLISTED),
-                ):
-                    _do_application_status(
-                        application,
-                        applications.STATUS_SHORTLISTED,
-                        "Applicant shortlisted.",
-                    )
-            with col_reject:
-                if st.button(
-                    "Reject",
-                    key=f"biz_reject_{app_id}",
-                    use_container_width=True,
-                ):
-                    _do_application_status(
-                        application,
-                        applications.STATUS_REJECTED,
-                        "Application rejected. Any open interview was closed.",
-                    )
+    if status not in applications.TERMINAL_STATUSES:
+        col_shortlist, col_reject = st.columns(2)
+        with col_shortlist:
+            if st.button(
+                "Shortlist",
+                key=f"biz_shortlist_{app_id}",
+                use_container_width=True,
+                disabled=(status == applications.STATUS_SHORTLISTED),
+            ):
+                _do_application_status(
+                    application,
+                    applications.STATUS_SHORTLISTED,
+                    "Applicant shortlisted.",
+                )
+        with col_reject:
+            if st.button(
+                "Reject",
+                key=f"biz_reject_{app_id}",
+                use_container_width=True,
+            ):
+                _do_application_status(
+                    application,
+                    applications.STATUS_REJECTED,
+                    "Application rejected. Any open interview was closed.",
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -309,12 +309,19 @@ def _render_business_interview_card(interview: dict[str, Any]) -> None:
 # Entry point
 # ---------------------------------------------------------------------------
 def render_business_interviews() -> None:
-    st.subheader("📋 Applicants & interviews")
-    st.info(
-        "This is **local demonstration data**. There is no real login, so Gigsie "
-        "cannot verify who a business is or that you own a gig. Applicants below are "
-        "the local profiles that applied to gigs saved on this device. Gigsie does "
-        "not book anything on an external calendar and does not verify meeting rooms."
+    ui_common.section_heading(
+        "Applicants & interviews",
+        "Real proposals against gigs saved on this device.",
+    )
+    ui_common.panel(
+        "Local demonstration data",
+        "No accounts, so identity cannot be verified",
+        body=(
+            "<p>These are <b>local demonstration data</b>. Gigsie "
+            "<b>cannot verify who a business is</b> or that you own a gig, and nothing "
+            "is booked on an external calendar.</p>"
+        ),
+        footer=ui_common.tags(["No verified accounts", "No calendar booking"]),
     )
 
     _render_flash()
@@ -351,7 +358,10 @@ def render_business_interviews() -> None:
 
     linked_gig_ids = {application.get("gig_id") for application in linked}
 
-    st.markdown("#### Interview requests & responses")
+    ui_common.section_heading(
+        "Interview requests & responses",
+        "Times use this device's local time; only the stored status is kept.",
+    )
     mine = [
         interview
         for interview in all_interviews
@@ -374,7 +384,7 @@ def render_business_interviews() -> None:
             for interview in closed:
                 _render_business_interview_card(interview)
 
-    st.markdown("#### Applicants by gig")
+    ui_common.section_heading("Applicants by gig", "Grouped by the gig they applied to.")
     ordered_gig_ids: list[Any] = []
     for application in linked:
         gig_id = application.get("gig_id")
@@ -384,11 +394,11 @@ def render_business_interviews() -> None:
     for gig_id in ordered_gig_ids:
         gig = gigs_by_id.get(gig_id) or {}
         group = [a for a in linked if a.get("gig_id") == gig_id]
-        heading = f"##### {gig.get('title') or 'Untitled gig'}"
+        heading = f"{gig.get('title') or 'Untitled gig'}"
         if gig.get("sample"):
-            st.markdown(heading + " " + ui_common.sample_tag(), unsafe_allow_html=True)
+            st.markdown(f"##### {heading} " + ui_common.sample_tag(), unsafe_allow_html=True)
         else:
-            st.markdown(heading)
+            st.markdown(f"##### {heading}")
         st.caption(f"Gig ID: {gig_id} · {len(group)} applicant(s)")
         for application in group:
             _render_applicant_card(application, gig)

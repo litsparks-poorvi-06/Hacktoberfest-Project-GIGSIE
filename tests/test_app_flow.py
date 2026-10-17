@@ -79,6 +79,12 @@ class AppFlowTests(unittest.TestCase):
         self.assertFalse(at.exception)
         return at
 
+    @staticmethod
+    def _to_passport(at):
+        """Create with AI and the Gig Passport are separate pages (Stage 9)."""
+        _find_button(at, "Continue to the Gig Passport").click().run()
+        return at
+
     def _fill_request(self, at) -> None:
         at.text_input[0].set_value("Sunrise Bakery")
         at.text_area[0].set_value("Promote our new seasonal menu on Instagram.")
@@ -113,6 +119,7 @@ class AppFlowTests(unittest.TestCase):
         self._fill_request(at)
         _find_button(at, "Generate task brief").click().run()
         self.assertFalse(at.exception)
+        self._to_passport(at)
 
         # The editor is now shown; edit before publishing.
         at.text_input[0].set_value("EDITED bakery menu posts")
@@ -134,6 +141,7 @@ class AppFlowTests(unittest.TestCase):
         at = self._open_business()
         self._fill_request(at)
         _find_button(at, "Generate task brief").click().run()
+        self._to_passport(at)
         _find_button(at, "Publish gig").click().run()
 
         # Two extra reruns, as a page refresh would cause.

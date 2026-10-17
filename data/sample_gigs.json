@@ -1,42 +1,58 @@
 [
   {
     "id": "g_sample_0001",
-    "title": "Promote a new bakery menu on Instagram",
+    "title": "Three Instagram posts for a bakery's new menu",
     "business_name": "Sunrise Bakery",
-    "work_needed": "I run a small bakery and want help promoting my new seasonal menu on Instagram.",
-    "desired_outcome": "More local customers know about the new menu and visit the shop.",
+    "work_needed": "I run a small neighbourhood bakery and want help promoting our new seasonal menu on Instagram, using the photos and details we already have.",
+    "desired_outcome": "More local families know the new menu is available and visit the shop this week.",
     "budget_inr": 800,
     "deadline": "2 days",
-    "additional_context": "Most customers are nearby families. We already post occasionally on Instagram.",
+    "additional_context": "We already post occasionally on Instagram. Most customers are nearby families with young children.",
+    "required_skills": [
+      "Canva",
+      "Copywriting"
+    ],
     "brief": {
-      "project_objective": "Promote the bakery's new seasonal menu to local families on Instagram and encourage more shop visits.",
-      "proposed_deliverables": [
-        "Three Instagram posts (images with captions) featuring the new menu items",
-        "One short caption pack the owner can reuse for stories",
-        "A simple posting schedule for the two-day window"
+      "objective": "Promote the bakery's new seasonal menu to local families on Instagram using the photos and details the bakery already has.",
+      "deliverables": [
+        "Three ready-to-post square images (1080 x 1080) featuring different new menu items",
+        "One caption for each image, written in the bakery's friendly, local voice",
+        "A short note listing which image to post on which day of the two-day window"
       ],
       "required_skills": [
-        "Social media content creation",
-        "Basic graphic design",
+        "Canva",
         "Copywriting"
       ],
       "clarifying_questions": [
-        "Which menu items should be featured, and do you have photos of them?",
-        "Do you have brand colours or a logo we should use?",
-        "Is there a specific call to action, such as a limited-time offer?"
+        "Which three menu items should be featured first?",
+        "Do you have brand colours or a logo we should match?",
+        "Is there a specific offer or opening time to mention?"
       ],
       "acceptance_criteria": [
-        "Three ready-to-post images with captions are delivered",
-        "Captions mention the new menu and a clear call to action",
-        "Content matches the bakery's existing look and feel"
+        "Three images are delivered at 1080 x 1080 with a caption for each",
+        "Every caption names the new menu and includes the shop's location",
+        "Images use the bakery's existing colours and logo if one is provided"
       ],
       "assumptions": [
         "The bakery already has an Instagram account",
-        "The owner can provide or approve photos of the menu items"
+        "The bakery can send photos of the three featured menu items"
       ],
-      "scope_deadline_concerns": [
-        "Two days is a short window if photos still need to be taken",
-        "The number of revisions the owner wants is not yet specified"
+      "warnings": [
+        "Two days is a short window if the menu photos still need to be taken",
+        "The number of small text changes wanted is not yet specified"
+      ],
+      "exclusions": [
+        "No paid advertising or boosted posts",
+        "No professional photography",
+        "No full marketing campaign or content calendar"
+      ],
+      "client_responsibilities": [
+        "Send photos of the three featured menu items",
+        "Confirm the shop's location and opening hours to display",
+        "Review the drafts within the two-day window"
+      ],
+      "revision_expectations": [
+        "One round of small wording changes per caption"
       ]
     },
     "status": "open",
@@ -45,46 +61,184 @@
   },
   {
     "id": "g_sample_0002",
-    "title": "Build a simple one-page website for a tutoring service",
+    "title": "One-page website for a small tutoring service",
     "business_name": "Bright Minds Tutoring",
-    "work_needed": "We need a simple one-page website that explains our tutoring service and how to book a session.",
-    "desired_outcome": "Parents can understand what we offer and contact us from a clear page.",
+    "work_needed": "We tutor school students part-time and need a simple one-page website that explains our subjects and how to get in touch.",
+    "desired_outcome": "Parents can quickly understand what we offer and contact us from any device.",
     "budget_inr": 2500,
-    "deadline": "10 days",
-    "additional_context": "We do not have a logo yet, but we can provide text and a phone number.",
+    "deadline": "1 week",
+    "additional_context": "We can provide all the text, our phone number, and a few photos. We do not have a logo yet.",
+    "required_skills": [
+      "HTML",
+      "CSS",
+      "Responsive design"
+    ],
     "brief": {
-      "project_objective": "Create a clear, mobile-friendly one-page website for a tutoring service that explains the offering and makes it easy to get in touch.",
-      "proposed_deliverables": [
-        "A single responsive page with an intro, services, and contact section",
-        "Simple styling that works on phones and desktops",
-        "A short guide for the owner on how to update the text"
+      "objective": "Build a simple, mobile-friendly one-page website for a tutoring service using the text and contact details the owner supplies.",
+      "deliverables": [
+        "One responsive one-page site with Intro, Subjects, About, and Contact sections",
+        "The page laid out correctly on a phone (about 360px wide) and a desktop screen",
+        "A short README explaining how to edit the text or swap a photo"
       ],
       "required_skills": [
-        "HTML and CSS",
-        "Basic responsive design",
-        "Clear written communication"
+        "HTML",
+        "CSS",
+        "Responsive design"
       ],
       "clarifying_questions": [
-        "Where will the site be hosted, and do you already own a domain?",
-        "Which contact method should be the main call to action?",
-        "What subjects and age groups should the services section list?"
+        "Which subjects and age groups should the Subjects section list?",
+        "Should the main contact button be a phone call or a WhatsApp link?",
+        "Do you already have a domain, or should this be a single HTML file?"
       ],
       "acceptance_criteria": [
-        "The page displays correctly on a phone and a desktop",
-        "Services and contact details are accurate and easy to find",
-        "The owner has simple instructions for editing the text"
+        "The page loads with no broken layout at 360px and 1280px widths",
+        "All four sections (Intro, Subjects, About, Contact) are present",
+        "The phone number and contact method match exactly what the owner supplied",
+        "The README explains how to change the text"
       ],
       "assumptions": [
-        "The owner can provide the text content and contact details",
-        "A simple static page is enough for now; no online booking system is required"
+        "The owner provides all final text and contact details",
+        "A single static page is enough; no online booking is needed"
       ],
-      "scope_deadline_concerns": [
-        "Adding online booking later would be a separate, larger task",
+      "warnings": [
+        "Adding online booking or payments later would be a separate, larger task",
         "There is no logo yet, so a simple text header will be used"
+      ],
+      "exclusions": [
+        "No online booking or payment system",
+        "No custom backend or database",
+        "No logo design"
+      ],
+      "client_responsibilities": [
+        "Provide the final text for each section",
+        "Provide the phone number and contact method to display",
+        "Provide one to three photos, or confirm text-only sections"
+      ],
+      "revision_expectations": [
+        "Two rounds of layout or text adjustments within the week"
       ]
     },
     "status": "open",
     "created_at": "2026-10-15T09:05:00+00:00",
+    "sample": true
+  },
+  {
+    "id": "g_sample_0003",
+    "title": "Ten product descriptions for a small handloom shop",
+    "business_name": "Lakshmi Handloom Store",
+    "work_needed": "We sell handloom sarees and fabric in a small shop and need clear product descriptions for ten items we already stock.",
+    "desired_outcome": "Customers can understand each item before visiting, without asking us basic questions.",
+    "budget_inr": 1200,
+    "deadline": "3 days",
+    "additional_context": "We can send a list of the ten items with their fabric, colour, and size. We do not have professional photos.",
+    "required_skills": [
+      "Copywriting",
+      "Attention to detail"
+    ],
+    "brief": {
+      "objective": "Write ten short product descriptions for a small handloom shop using only the item details the owner supplies.",
+      "deliverables": [
+        "Ten product descriptions of about 50 to 70 words each",
+        "Each description states the fabric, colour, size, and care instructions",
+        "A single checklist noting any item information that was missing"
+      ],
+      "required_skills": [
+        "Copywriting",
+        "Attention to detail"
+      ],
+      "clarifying_questions": [
+        "Are there any measurements or weaves we should describe precisely?",
+        "Should the descriptions mention price, or leave it for the shop?",
+        "Are any of the ten items handmade in a way we should highlight?"
+      ],
+      "acceptance_criteria": [
+        "Ten descriptions are delivered, each about 50 to 70 words",
+        "Every description names the fabric, colour, and size supplied",
+        "No detail is invented; anything missing is listed in the checklist"
+      ],
+      "assumptions": [
+        "The shop supplies the list of ten items with their details",
+        "The descriptions are for the shop's own reference, not a specific website"
+      ],
+      "warnings": [
+        "The work cannot be completed until the item details are supplied",
+        "Price wording is left out unless the shop confirms it"
+      ],
+      "exclusions": [
+        "No full e-commerce website",
+        "No search-engine ranking work or guarantees",
+        "No product photography",
+        "No more than ten items"
+      ],
+      "client_responsibilities": [
+        "Provide the list of ten items with fabric, colour, and size",
+        "Confirm whether price should appear in the descriptions"
+      ],
+      "revision_expectations": [
+        "One round of corrections across the ten descriptions"
+      ]
+    },
+    "status": "open",
+    "created_at": "2026-10-15T09:10:00+00:00",
+    "sample": true
+  },
+  {
+    "id": "g_sample_0004",
+    "title": "A simple service price list for a plumbing business",
+    "business_name": "QuickFix Plumbing",
+    "work_needed": "We want a clear one-page price list of our common services that we can print and send to customers.",
+    "desired_outcome": "Customers understand our common services and starting prices before they call.",
+    "budget_inr": 900,
+    "deadline": "2 days",
+    "additional_context": "We can give you the list of services and starting prices. These are example terms for a sample gig.",
+    "required_skills": [
+      "Document formatting",
+      "Copywriting"
+    ],
+    "brief": {
+      "objective": "Create a clear one-page service price list for a small plumbing business using the services and starting prices the owner supplies.",
+      "deliverables": [
+        "One one-page price list as a PDF",
+        "An editable version (for example a DOCX) so the owner can change prices later",
+        "A neat table with a Service column and a Starting price column"
+      ],
+      "required_skills": [
+        "Document formatting",
+        "Copywriting"
+      ],
+      "clarifying_questions": [
+        "Which services and starting prices should the list include?",
+        "Should an emergency call-out rate be listed separately?",
+        "What phone number and service area should appear at the top?"
+      ],
+      "acceptance_criteria": [
+        "The price list fits on one page and is easy to read",
+        "Every service and starting price matches the owner's list exactly",
+        "Both a PDF and an editable file are delivered"
+      ],
+      "assumptions": [
+        "The owner supplies the services and starting prices",
+        "A simple one-page document is enough; no website is needed"
+      ],
+      "warnings": [
+        "The example prices are illustrative and are not verified market rates",
+        "The work cannot be finished until the owner confirms the service list"
+      ],
+      "exclusions": [
+        "No website or online booking",
+        "No legal contract wording",
+        "No logo design"
+      ],
+      "client_responsibilities": [
+        "Provide the services and starting prices to display",
+        "Confirm the phone number and service area at the top of the page"
+      ],
+      "revision_expectations": [
+        "One round of price or wording corrections"
+      ]
+    },
+    "status": "open",
+    "created_at": "2026-10-15T09:15:00+00:00",
     "sample": true
   }
 ]

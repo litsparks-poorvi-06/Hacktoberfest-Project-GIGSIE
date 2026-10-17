@@ -10,6 +10,7 @@ This file is the *presentation* layer only. The real work lives elsewhere:
     * profiles.py     - student profiles (local prototype, no accounts)
     * applications.py - student proposals: validation, dedupe, status transitions
     * student_ui.py   - the student area: profile, browse gigs, and apply
+    * ui_common.py    - the design system, navigation shell, and shared cards
 
 The business journey is one coherent flow:
 
@@ -27,6 +28,7 @@ Run locally with:
 
 from __future__ import annotations
 
+from html import escape as _escape
 from uuid import uuid4
 
 import streamlit as st
@@ -41,27 +43,37 @@ from gig_workflow import (
 )
 from business_ui import render_business_interviews
 from student_ui import render_student
+import applications
 import fairscope
+import interviews
 import storage
 import ui_common
+import voice_narration
 
 TAGLINE = ui_common.TAGLINE
 PRODUCT_BLURB = (
-    "Gigsie helps a small business turn a vague request into a clear, realistic "
-    "freelance task. The AI drafts the brief, Python checks its scope, and you decide "
-    "what gets published. Students then discover the gig, read the same agreed scope, "
-    "and apply."
+    "Gigsie helps a small business turn a vague request into a clear, achievable "
+    "freelance gig. The AI drafts the brief, Python checks its scope, and the business "
+    "decides what gets published. Students then discover the gig, read the same agreed "
+    "scope, and apply."
 )
 
-# The steps shown in the business progress rail.
-_BUSINESS_STEPS = ["Describe the task", "Draft the brief", "Review the scope", "Publish"]
-_STUDENT_STEPS = ["Profile", "Browse gigs", "Apply", "Assess & interview"]
+# The visible progress through the Create-with-AI workspace.
+_BUSINESS_STEPS = [
+    "Describe the task",
+    "Generate the draft",
+    "Review FairScope",
+    "Compare strategies",
+    "Edit the Gig Passport",
+    "Publish the gig",
+]
 
 # Session keys that make up a single draft, cleared together by "Start a new brief".
 DRAFT_KEYS = [
     "request",
     "brief_result",
     "scope_variant",
+    "scope_variant_key",
     "draft_key",
     "published_record",
     "published_draft_key",
@@ -79,6 +91,8 @@ def _inject_styles() -> None:
 def _init_state() -> None:
     if "view" not in st.session_state:
         st.session_state["view"] = ui_common.VIEW_HOME
+    if "section" not in st.session_state:
+        st.session_state["section"] = ui_common.SEC_OVERVIEW
     for key in DRAFT_KEYS:
         if key not in st.session_state:
             st.session_state[key] = None
@@ -86,8 +100,9 @@ def _init_state() -> None:
         st.session_state["draft_revision"] = 0
 
 
-def _go(view: str) -> None:
+def _go(view: str, section: str = ui_common.SEC_OVERVIEW) -> None:
     st.session_state["view"] = view
+    st.session_state["section"] = section
     st.rerun()
 
 
@@ -100,26 +115,122 @@ def _reset_draft() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Landing
+# Real local data for every dashboard panel
 # ---------------------------------------------------------------------------
+def _home_budget(gig: dict) -> str:
+    """Readable budget for the cards; never guesses a number."""
+    return ui_common.gig_budget(gig)
+
+
+def _snapshot() -> dict:
+    """Everything the dashboards read, in one guarded pass.
+
+    Every figure comes from local storage. A read failure is reported honestly
+    instead of being hidden behind a zero.
+    """
+    snapshot: dict = {
+        "gigs": [],
+        "published": [],
+        "samples": [],
+        "applications": [],
+        "interviews": [],
+        "pending_interviews": [],
+        "recent": [],
+        "error": None,
+    }
+    try:
+        snapshot["gigs"] = storage.load_gigs()
+    except storage.StorageError as error:
+        snapshot["error"] = str(error)
+        return snapshot
+
+    snapshot["published"] = [gig for gig in snapshot["gigs"] if not gig.get("sample")]
+    snapshot["samples"] = [gig for gig in snapshot["gigs"] if gig.get("sample")]
+    snapshot["recent"] = list(reversed(snapshot["published"]))[:4]
+
+    try:
+        snapshot["applications"] = applications.all_applications()
+    except storage.StorageError:
+        snapshot["applications"] = []
+    try:
+        loaded = storage.load_interviews()
+    except storage.StorageError:
+        loaded = []
+    snapshot["interviews"] = loaded
+    snapshot["pending_interviews"] = [
+        interview
+        for interview in loaded
+        if interview.get("status") in interviews.PENDING_BUSINESS_STATUSES
+    ]
+    return snapshot
+
+
+def _home_snapshot() -> dict:
+    """Backwards-compatible wrapper around :func:`_snapshot`."""
+    return _snapshot()
+
+
+def _gigs_by_id(snapshot: dict) -> dict:
+    return {gig.get("id"): gig for gig in snapshot["gigs"] if gig.get("id")}
+
+
+def _linked_applications(snapshot: dict) -> list[dict]:
+    """Applications whose gig really exists locally - nothing is invented."""
+    known = _gigs_by_id(snapshot)
+    return [
+        application
+        for application in snapshot["applications"]
+        if application.get("gig_id") in known
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Overview (the app home)
+# ---------------------------------------------------------------------------
+def _profile_chip() -> tuple[str, str]:
+    """The real local student profile, if one is loaded."""
+    profile = st.session_state.get("student_profile")
+    if isinstance(profile, dict) and profile.get("id"):
+        name = str(profile.get("display_name") or "Unnamed student")
+        return name, f"Student profile · {profile.get('id')}"
+    return "", ""
+
+
 def render_landing() -> None:
-    ui_common.hero()
-    st.markdown(f'<p class="gs-lead">{PRODUCT_BLURB}</p>', unsafe_allow_html=True)
+    """Overview: a real dashboard of what is saved on this device."""
+    name, sub = _profile_chip()
+    ui_common.top_header(
+        crumb=["Workspace", "Overview"],
+        role=ui_common.ROLE_BUSINESS,
+        search=True,
+        search_key="gs_search",
+        search_placeholder="Search your gigs",
+        profile_name=name,
+        profile_sub=sub,
+        primary_label="Create a gig with AI",
+        primary_target=(ui_common.VIEW_BUSINESS, ui_common.SEC_CREATE),
+    )
 
-    st.markdown("#### Choose how you want to start")
-    col_business, col_student = st.columns(2, gap="large")
+    ui_common.eyebrow("Local-first prototype")
+    ui_common.display_title("Overview", "of this workspace")
+    st.markdown(
+        f'<p class="gs-page-sub">{_escape(ui_common.TAGLINE)}</p>',
+        unsafe_allow_html=True,
+    )
 
-    with col_business:
-        ui_common.eyebrow("For businesses")
-        st.markdown(
-            """
-            <div class="gs-card gs-card--brand">
-                <h3>🏪 Post a clear gig</h3>
-                <p>Describe a task in plain words. Gigsie drafts a structured brief,
-                reviews its scope, and helps you publish it as a gig students can trust.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
+    snapshot = _snapshot()
+    if snapshot["error"]:
+        st.error(f"Saved gigs could not be read: {snapshot['error']}")
+
+    # --- The two real entry points ---------------------------------------
+    left, right = st.columns(2, gap="medium")
+    with left:
+        ui_common.panel(
+            "For businesses",
+            "Turn a vague request into a clear gig",
+            body="",
+            footer=ui_common.tags(["AI draft", "FairScope", "Publish"]),
+            fill=True,
         )
         if st.button(
             "Start a business request",
@@ -127,97 +238,587 @@ def render_landing() -> None:
             use_container_width=True,
             key="landing_business",
         ):
-            _go("business")
-
-    with col_student:
-        ui_common.eyebrow("For students")
-        st.markdown(
-            """
-            <div class="gs-card gs-card--accent">
-                <h3>🎓 Find work that fits</h3>
-                <p>Browse gigs that match your skills, read the agreed scope in the "
-                "Gig Passport, and apply with a clear proposal.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
+            _go(ui_common.VIEW_BUSINESS)
+    with right:
+        ui_common.panel(
+            "For students",
+            "Find work that matches your skills",
+            body="",
+            footer=ui_common.tags(["Profile", "Apply", "Practice"]),
+            accent="alt",
+            fill=True,
         )
         if st.button(
             "Enter the student area",
             use_container_width=True,
             key="landing_student",
         ):
-            _go("student")
+            _go(ui_common.VIEW_STUDENT, ui_common.SEC_STUDENT_HOME)
 
-    st.divider()
-    st.markdown("#### How Gigsie works")
-    col_1, col_2, col_3, col_4 = st.columns(4)
-    with col_1:
-        st.markdown(
-            '<div class="gs-card"><h4>1 · Describe</h4><p>The business explains the '
-            "work and the outcome it wants.</p></div>",
-            unsafe_allow_html=True,
+    # --- Metric tiles -----------------------------------------------------
+    linked = _linked_applications(snapshot)
+    metrics = st.columns(4, gap="medium")
+    with metrics[0]:
+        ui_common.stat_card("Published gigs", str(len(snapshot["published"])), "Visible to students")
+    with metrics[1]:
+        ui_common.stat_card("Applications", str(len(linked)), "Against your gigs", tone="info")
+    with metrics[2]:
+        ui_common.stat_card(
+            "Awaiting a reply",
+            str(len(snapshot["pending_interviews"])),
+            "Interview requests",
+            tone="warn",
         )
-    with col_2:
-        st.markdown(
-            '<div class="gs-card"><h4>2 · Draft</h4><p>The AI drafts scope, skills, '
-            "and open questions as an editable brief.</p></div>",
-            unsafe_allow_html=True,
+    with metrics[3]:
+        ui_common.stat_card("Sample gigs", str(len(snapshot["samples"])), "Labelled examples")
+
+    # --- Three panel columns ----------------------------------------------
+    main_col, mid_col, side_col = st.columns([1.3, 1, 1], gap="medium")
+    with main_col:
+        _overview_gigs_panel(snapshot)
+    with mid_col:
+        _overview_workflow_panel()
+    with side_col:
+        _needs_attention_panel(snapshot, linked)
+
+    # --- Pending applications, only when real data exists -------------------
+    if linked:
+        ui_common.header_rule()
+        ui_common.section_heading(
+            "Pending applications", "Real proposals against gigs saved on this device."
         )
-    with col_3:
-        st.markdown(
-            '<div class="gs-card"><h4>3 · Review</h4><p>FairScope adds deterministic '
-            "checks, kept separate from the AI's suggestions.</p></div>",
-            unsafe_allow_html=True,
+        _pending_applications_panel(snapshot, linked)
+
+    # --- Saved gigs table (filtered by the header search) ------------------
+    ui_common.header_rule()
+    ui_common.section_heading(
+        "Your workspace", "Every record saved on this device, newest first."
+    )
+    _overview_table(snapshot)
+
+
+def _pending_applications_panel(snapshot: dict, linked: list[dict]) -> None:
+    """A compact row per real application, with its actual status."""
+    rows = []
+    for application in linked[:6]:
+        rows.append(
+            "<div>"
+            f"<b>{_escape(str(application.get('student_name') or 'Unnamed student'))}</b>"
+            f'<div class="muted">{_escape(str(application.get("gig_title") or "Untitled gig"))}'
+            f" · {_escape(str(application.get('created_at') or ''))}</div></div>"
+            f"<div>{ui_common.status_pill(application.get('status'))}</div>"
         )
-    with col_4:
-        st.markdown(
-            '<div class="gs-card"><h4>4 · Publish</h4><p>The approved Gig Passport is '
-            "saved so students read the same scope.</p></div>",
-            unsafe_allow_html=True,
+    ui_common.panel(
+        f"{len(linked)} application(s) across your gigs",
+        f"{len(snapshot['pending_interviews'])} interview request(s) awaiting a reply",
+        body=ui_common.list_rows(rows),
+        footer=ui_common.tags(["Local demonstration data"]),
+    )
+    if st.button(
+        "Review applicants", key="overview_applicants", use_container_width=True
+    ):
+        _go(ui_common.VIEW_BUSINESS, ui_common.SEC_APPLICANTS)
+
+
+def _render_applicants_page() -> None:
+    """Applicants and interviews, grouped by the gig they belong to."""
+    _business_header(
+        "Applicants & Interviews",
+        primary_label="Published Gigs",
+        primary_target=(ui_common.VIEW_BUSINESS, ui_common.SEC_PUBLISHED),
+    )
+    ui_common.page_header(
+        "Applicants & Interviews",
+        "Real applications and interview requests against gigs saved on this device.",
+        eyebrow_text="Business · Applicants & Interviews",
+    )
+
+    snapshot = _snapshot()
+    if snapshot["error"]:
+        st.error(f"Saved gigs could not be read: {snapshot['error']}")
+        return
+    linked = _linked_applications(snapshot)
+
+    tiles = st.columns(3, gap="medium")
+    with tiles[0]:
+        ui_common.stat_card("Applications", str(len(linked)), "Against your gigs")
+    with tiles[1]:
+        ui_common.stat_card(
+            "Awaiting a reply",
+            str(len(snapshot["pending_interviews"])),
+            "Interview requests",
+            tone="warn",
+        )
+    with tiles[2]:
+        waiting = [
+            application
+            for application in linked
+            if application.get("status")
+            in (applications.STATUS_SUBMITTED, applications.STATUS_SHORTLISTED)
+        ]
+        ui_common.stat_card(
+            "No decision yet", str(len(waiting)), "Not shortlisted or rejected", tone="info"
         )
 
-    st.caption(
-        "Gigsie is a prototype that connects small businesses with students and "
-        "beginner freelancers. There are no accounts, payments, or ratings yet."
+    ui_common.header_rule()
+    render_business_interviews()
+
+
+def _overview_gigs_panel(snapshot: dict) -> None:
+    """Left column: the real gigs saved locally."""
+    if not snapshot["published"]:
+        ui_common.panel(
+            "Your Gigs",
+            "Nothing published yet",
+            body="<p>Describe a task, review the scope, then publish. Your first "
+            "gig appears here and in the student listing.</p>",
+            footer=ui_common.tags(["Draft", "Review", "Publish"]),
+            fill=True,
+        )
+        if st.button(
+            "Create a gig with AI", key="overview_empty_create", use_container_width=True
+        ):
+            _go(ui_common.VIEW_BUSINESS, ui_common.SEC_CREATE)
+        return
+
+    recent = snapshot["recent"]
+    ui_common.panel(
+        "Your Gigs",
+        f"{len(snapshot['published'])} published on this device",
+        body=ui_common.list_rows([ui_common.gig_row(gig) for gig in recent]),
+        footer=ui_common.tags(ui_common.gig_skills(recent[0]), limit=3),
+        fill=True,
+    )
+    if st.button("Open Published Gigs", key="overview_open_published", use_container_width=True):
+        _go(ui_common.VIEW_BUSINESS, ui_common.SEC_PUBLISHED)
+
+
+def _overview_workflow_panel() -> None:
+    """Centre column: how a gig becomes clear, plus the one real next action."""
+    ui_common.module_card(
+        "How a gig becomes clear",
+        "Six steps, you stay in control",
+        body=ui_common.bullets(
+            [
+                "Describe the work",
+                "AI drafts the brief",
+                "FairScope checks it",
+                "You approve and publish",
+            ]
+        ),
+        tags=ui_common.tags(["Groq", "gpt-oss-20b"]),
+        fill=True,
+    )
+    if st.button("Create a gig with AI", key="overview_create", use_container_width=True):
+        _go(ui_common.VIEW_BUSINESS, ui_common.SEC_CREATE)
+
+
+def _overview_table(snapshot: dict) -> None:
+    """A compact table of the real saved gigs, filtered by the header search."""
+    gigs = list(reversed(snapshot["published"])) + list(snapshot["samples"])
+    if not gigs:
+        ui_common.empty_state(
+            "▤",
+            "Nothing saved on this device yet",
+            "Publish a gig and it will show up here with its budget, deadline, and status.",
+        )
+        return
+
+    query = str(st.session_state.get("gs_search") or "").strip().lower()
+    if query:
+        gigs = [
+            gig
+            for gig in gigs
+            if query in ui_common.gig_title(gig).lower()
+            or query in ui_common.gig_context(gig).lower()
+            or any(query in skill.lower() for skill in ui_common.gig_skills(gig))
+        ]
+        if not gigs:
+            ui_common.empty_state(
+                "⌕",
+                "No saved gig matches that search",
+                "Try a title, a business name, or a skill such as Canva.",
+            )
+            return
+        st.caption(f"{len(gigs)} saved gig(s) match '{query}'.")
+
+    rows = []
+    for gig in gigs:
+        rows.append(
+            [
+                f"<b>{_escape(ui_common.gig_title(gig))}</b>"
+                + (f" {ui_common.sample_tag()}" if gig.get("sample") else ""),
+                _escape(ui_common.gig_context(gig)),
+                ui_common.status_pill(
+                    "sample" if gig.get("sample") else gig.get("status", "open"),
+                    "Sample" if gig.get("sample") else str(gig.get("status", "open")).title(),
+                ),
+                _escape(ui_common.gig_budget(gig)),
+                _escape(ui_common.gig_deadline(gig)),
+                f'<span class="muted">{_escape(str(gig.get("id") or ""))}</span>',
+            ]
+        )
+    ui_common.data_table(
+        ["Gig", "Business", "Status", "Budget", "Deadline", "ID"], rows
     )
 
 
 def _top_bar() -> None:
-    """Back-to-home control shared by the business and student areas."""
+    """Kept for compatibility: the back control now lives in the page header."""
     col_back, _ = st.columns([1, 5])
     with col_back:
         if st.button("← Back to start", key="back_to_landing"):
-            _go("landing")
+            _go(ui_common.VIEW_HOME)
 
 
 # ---------------------------------------------------------------------------
-# Business flow
+# Business workspace
 # ---------------------------------------------------------------------------
-def render_business() -> None:
-    _top_bar()
+def render_business(section: str = "") -> None:
+    """The business side. ``section`` is one of the sidebar destinations.
 
+    Each workflow gets its own page, so no page is a single long column:
+    create a request -> FairScope review -> Gig Passport -> publish.
+    """
+    if section == ui_common.SEC_PASSPORT:
+        _render_passport_page()
+        return
+    if section == ui_common.SEC_PUBLISHED:
+        _render_published_page()
+        return
+    if section == ui_common.SEC_APPLICANTS:
+        _render_applicants_page()
+        return
+    _render_create_page()
+
+
+def _business_header(
+    crumb: str,
+    *,
+    primary_label: str = "",
+    primary_target: tuple[str, str] | None = None,
+    search: bool = False,
+    search_placeholder: str = "",
+) -> None:
+    """One header shape for every business page."""
+    status_name, status_sub, status_avatar = _business_status()
+    ui_common.top_header(
+        crumb=["Business", crumb],
+        role=ui_common.ROLE_BUSINESS,
+        back_key="back_to_landing",
+        search=search,
+        search_key="gs_search",
+        search_placeholder=search_placeholder or "Search saved gigs",
+        profile_name=status_name,
+        profile_sub=status_sub,
+        profile_avatar=status_avatar,
+        primary_label=primary_label,
+        primary_target=primary_target,
+    )
+
+
+def _business_status() -> tuple[str, str]:
+    """Real local status for the header: the active student profile, if any."""
+    profile = st.session_state.get("student_profile")
+    if isinstance(profile, dict) and profile.get("id"):
+        return (
+            str(profile.get("display_name") or "Unnamed student"),
+            f"Student profile · {profile.get('id')}",
+            "",
+        )
+    snapshot = _snapshot()
+    if snapshot["error"]:
+        return "Storage problem", "Saved gigs could not be read", "!"
+    return (
+        f"{len(snapshot['published'])} published gig(s)",
+        "Business view · this device",
+        "◆",
+    )
+
+
+def _needs_attention_panel(snapshot: dict, linked: list[dict]) -> None:
+    """Only real, unresolved items ever appear here."""
+    pending = snapshot["pending_interviews"]
+    waiting = [
+        application
+        for application in linked
+        if application.get("status")
+        in (applications.STATUS_SUBMITTED, applications.STATUS_SHORTLISTED)
+    ]
+
+    if not pending and not waiting and st.session_state.get("brief_result") is None:
+        ui_common.module_card(
+            "Needs attention",
+            "Nothing outstanding",
+            body="<p>No interview request and no unreviewed application.</p>",
+            tags=ui_common.tags(["Clear"]),
+            fill=True,
+        )
+        if st.button(
+            "Review applicants",
+            key="attention_empty_applicants",
+            use_container_width=True,
+        ):
+            _go(ui_common.VIEW_BUSINESS, ui_common.SEC_APPLICANTS)
+        return
+
+    rows: list[str] = []
+    for interview in pending[:3]:
+        rows.append(
+            "<div>"
+            f"<b>{_escape(str(interview.get('student_name') or 'Unnamed student'))}</b>"
+            f'<div class="muted">{_escape(str(interview.get("requested_datetime") or "no time"))}'
+            "</div></div>"
+            f"<div>{ui_common.status_pill(interview.get('status'), 'Needs reply')}</div>"
+        )
+    notes: list[str] = []
+    if waiting:
+        notes.append(f"{len(waiting)} application(s) with no decision yet")
+    if st.session_state.get("brief_result") is not None and not st.session_state.get(
+        "published_record"
+    ):
+        notes.append("A generated brief is waiting to be published")
+    ui_common.module_card(
+        "Needs attention",
+        f"{len(pending)} interview request(s)",
+        body="".join(
+            [ui_common.list_rows(rows)] + [f"<p>{note}</p>" for note in notes]
+        ),
+        tags=ui_common.tags(["Real items only"]),
+        fill=True,
+    )
+    if st.button(
+        "Review applicants",
+        key="attention_applicants",
+        use_container_width=True,
+    ):
+        _go(ui_common.VIEW_BUSINESS, ui_common.SEC_APPLICANTS)
+
+
+# ---------------------------------------------------------------------------
+# Create with AI, then the FairScope review
+# ---------------------------------------------------------------------------
+def _create_active_step() -> int:
+    """Where the owner is in the create workflow, derived from real state."""
     if st.session_state.get("brief_result") is None:
-        ui_common.step_rail(_BUSINESS_STEPS, 0)
-        st.markdown("### 🏪 Describe the business task")
-        st.caption(
-            "Write the task in everyday language. Gigsie drafts a brief you review and "
-            "edit before publishing. Required fields are marked with *."
+        return 0
+    if st.session_state.get("published_record") is not None:
+        return 5
+    if st.session_state.get("scope_variant") is not None:
+        return 3
+    return 2
+
+
+def _render_create_page() -> None:
+    """The request form, or the FairScope review once a draft exists."""
+    has_draft = st.session_state.get("brief_result") is not None
+
+    _business_header(
+        "Create with AI",
+        primary_label="Review the Gig Passport" if has_draft else "See published gigs",
+        primary_target=(
+            (ui_common.VIEW_BUSINESS, ui_common.SEC_PASSPORT)
+            if has_draft
+            else (ui_common.VIEW_BUSINESS, ui_common.SEC_PUBLISHED)
+        ),
+    )
+    ui_common.page_header(
+        "FairScope review" if has_draft else "Create a gig with AI",
+        "Review the scope Gigsie produced, then approve a Gig Passport."
+        if has_draft
+        else "Describe the work in your own words.",
+        eyebrow_text="Business · Create with AI",
+    )
+    ui_common.step_rail(_BUSINESS_STEPS, _create_active_step())
+
+    if not has_draft:
+        ui_common.section_heading(
+            "Tell us what you need", "Required fields are marked with *."
         )
         _render_request_form()
-    else:
-        ui_common.step_rail(_BUSINESS_STEPS, 1)
-        _render_brief_editor(st.session_state["brief_result"])
+        return
 
-    st.divider()
+    _render_fairscope_review(st.session_state["brief_result"])
+
+
+def _render_fairscope_review(result: dict) -> None:
+    """A focused review screen: request, draft, checks, signals, strategies.
+
+    The editable Gig Passport and publishing live on their own page, so this
+    screen is about reviewing the scope rather than editing everything at once.
+    """
+    request = st.session_state.get("request") or {}
+    brief = result.get("brief") or {}
+    analysis = fairscope.analyze_brief(request, brief)
+
+    left, right = st.columns([1.15, 1], gap="medium")
+    with left:
+        # The whole request lives inside one card, so this column is a single
+        # element and matches the draft card beside it exactly.
+        request_pairs: list[tuple[str, str]] = []
+        if request.get("description"):
+            request_pairs.append(("What you need", str(request["description"])))
+        if request.get("outcome"):
+            request_pairs.append(("Outcome you want", str(request["outcome"])))
+        if request.get("extra_context"):
+            request_pairs.append(("Extra context", str(request["extra_context"])))
+        request_pairs.append(
+            ("Budget (INR)", f"{float(request.get('budget') or 0):,.0f}")
+        )
+        request_pairs.append(
+            ("Deadline", str(request.get("deadline") or "Not provided"))
+        )
+        ui_common.panel(
+            "Your original request",
+            "Exactly as you wrote it",
+            body=ui_common.key_values(request_pairs),
+            footer=ui_common.tags(["Never changed by Gigsie"]),
+            fill=True,
+        )
+
+    with right:
+        draft_pairs: list[tuple[str, str]] = [
+            ("Title", ui_common.gig_title(brief)),
+            ("Objective", str(brief.get("objective") or "Not written yet")),
+        ]
+        # key_values escapes its values, so the deliverables list is appended as
+        # markup rather than passed through it.
+        body = ui_common.key_values(draft_pairs)
+        deliverables = list(brief.get("deliverables") or [])
+        if deliverables:
+            body += (
+                '<div class="gs-note-h">Deliverables</div>'
+                + ui_common.bullets(deliverables)
+            )
+        ui_common.panel(
+            "The AI draft",
+            "A proposal, not a decision",
+            body=body,
+            footer=ui_common.tags(ui_common.gig_skills(brief), limit=6),
+            fill=True,
+        )
+
+    ui_common.header_rule()
+    _render_fairscope_panel(request, brief)
+    _render_strategy_section(request, brief)
+
+    ui_common.header_rule()
+    left_btn, right_note = st.columns([1, 1.6], gap="medium", vertical_alignment="center")
+    with left_btn:
+        if st.button(
+            "Continue to the Gig Passport",
+            type="primary",
+            use_container_width=True,
+            key="continue_to_passport",
+        ):
+            _go(ui_common.VIEW_BUSINESS, ui_common.SEC_PASSPORT)
+    with right_note:
+        ui_common.voice_brief(
+            label="Listen to FairScope",
+            text=voice_narration.build_fairscope_narration(
+                brief=brief, request=request, analysis=analysis
+            ),
+            key="voice_fairscope",
+            caption="A spoken summary of the draft above, built from the same fields.",
+        )
+
+    if st.button("Start a new brief", key="new_brief"):
+        _reset_draft()
+
+
+def _render_passport_page() -> None:
+    """The editable Gig Passport and the explicit publish action."""
+    result = st.session_state.get("brief_result")
+    if not isinstance(result, dict) or not result.get("brief"):
+        _business_header(
+            "Gig Passport",
+            primary_label="Create with AI",
+            primary_target=(ui_common.VIEW_BUSINESS, ui_common.SEC_CREATE),
+        )
+        ui_common.page_header(
+            "Gig Passport",
+            "There is no draft to edit yet.",
+            eyebrow_text="Business · Gig Passport",
+        )
+        ui_common.empty_state(
+            "🛂",
+            "No draft yet",
+            "Describe a task in Create with AI and the Gig Passport will be built here.",
+        )
+        if st.button(
+            "Create a gig with AI",
+            type="primary",
+            use_container_width=True,
+            key="passport_go_create",
+        ):
+            _go(ui_common.VIEW_BUSINESS, ui_common.SEC_CREATE)
+        return
+
+    _business_header(
+        "Gig Passport",
+        primary_label="Back to FairScope",
+        primary_target=(ui_common.VIEW_BUSINESS, ui_common.SEC_CREATE),
+    )
+    ui_common.page_header(
+        "Gig Passport",
+        "Edit the agreed scope, then publish it explicitly.",
+        eyebrow_text="Business · Gig Passport",
+    )
+    ui_common.step_rail(_BUSINESS_STEPS, 4)
+    _render_brief_editor(result)
+
+
+def _render_published_page() -> None:
+    _business_header(
+        "Published Gigs",
+        search=True,
+        search_placeholder="Search published gigs",
+        primary_label="Create a gig with AI",
+        primary_target=(ui_common.VIEW_BUSINESS, ui_common.SEC_CREATE),
+    )
+    ui_common.page_header(
+        "Published Gigs",
+        "Everything published on this device. Samples are listed last.",
+        eyebrow_text="Business · Published Gigs",
+    )
+
+    snapshot = _snapshot()
+    if snapshot["error"]:
+        st.error(f"Saved gigs could not be read: {snapshot['error']}")
+        return
+
+    columns = st.columns(4)
+    with columns[0]:
+        ui_common.stat_card("Published", str(len(snapshot["published"])), "Open to students")
+    with columns[1]:
+        ui_common.stat_card("Sample", str(len(snapshot["samples"])), "Labelled examples")
+    with columns[2]:
+        ui_common.stat_card(
+            "Applications", str(len(_linked_applications(snapshot))), "Against these gigs", tone="info"
+        )
+    with columns[3]:
+        ui_common.stat_card(
+            "Interviews",
+            str(len(snapshot["pending_interviews"])),
+            "Awaiting a reply",
+            tone="warn",
+        )
+
+    ui_common.header_rule()
     _render_saved_gigs()
-
-    st.divider()
+    ui_common.header_rule()
     render_business_interviews()
 
 
 def _render_request_form() -> None:
     with st.form("request_form"):
         st.markdown("##### Tell Gigsie about the work")
+        st.caption(
+            "Describe the task in everyday words, then give a real budget and deadline. "
+            "Example: *I run a bakery and want three Instagram posts for my new menu. "
+            "INR 800, needed in 2 days.* Budget and deadline are required so the scope "
+            "can be reviewed against them."
+        )
         project_name = st.text_input(
             "Business or project name (optional)",
             placeholder="e.g. Sunrise Bakery",
@@ -226,11 +827,13 @@ def _render_request_form() -> None:
             "What work needs to be done? *",
             placeholder="e.g. I want help promoting my new seasonal menu on Instagram.",
             height=100,
+            help="Plain words are fine. What is the task, and what already exists?",
         )
         outcome = st.text_area(
             "What outcome do you want? *",
             placeholder="e.g. More local customers see the menu and visit the shop.",
             height=100,
+            help="What should be different once this work is done?",
         )
 
         col_budget, col_deadline = st.columns(2)
@@ -296,6 +899,7 @@ def _generate_brief(request: dict) -> None:
     st.session_state["request"] = request
     st.session_state["brief_result"] = result
     st.session_state["scope_variant"] = None
+    st.session_state["scope_variant_key"] = None
     st.session_state["draft_key"] = str(uuid4())
     st.session_state["published_record"] = None
     st.session_state["published_draft_key"] = None
@@ -303,31 +907,88 @@ def _generate_brief(request: dict) -> None:
     st.rerun()
 
 
+def _passport_readiness(passport: dict) -> list[tuple[str, str]]:
+    """Real publication readiness, computed from the passport itself."""
+    sections = passport.get("sections") or {}
+    unresolved = [
+        label
+        for label, section in sections.items()
+        if isinstance(section, dict) and section.get("needs_clarification")
+    ]
+    essential = [
+        label
+        for label, section in sections.items()
+        if isinstance(section, dict)
+        and section.get("essential")
+        and section.get("needs_clarification")
+    ]
+    total = len(sections) or 1
+    return [
+        ("Scope sections", f"{total - len(unresolved)} of {total} specified"),
+        (
+            "Still needs clarification",
+            ", ".join(str(item).replace("_", " ") for item in unresolved) or "None",
+        ),
+        (
+            "Must be acknowledged",
+            ", ".join(str(item).replace("_", " ") for item in essential) or "None",
+        ),
+    ]
+
+
 def _render_brief_editor(result: dict) -> None:
+    """The editable Gig Passport: a spacious form with an explicit publish."""
     request = st.session_state.get("request") or {}
     brief = result.get("brief") or {}
     revision = st.session_state.get("draft_revision") or 0
-
-    ui_common.eyebrow("Draft ready")
-    st.markdown("### Review and edit the task brief")
-    st.success("Draft ready. Review and edit anything before you publish.")
-
-    metric_left, metric_right = st.columns(2)
-    metric_left.metric("Stated budget (INR)", f"{float(request.get('budget') or 0):,.0f}")
-    metric_right.metric("Stated deadline", request.get("deadline") or "Not provided")
-
-    # FairScope: deterministic clarity checks and scope signals for this draft.
-    _render_fairscope_panel(request, brief)
-
-    # Optional, explicit scope strategies. Nothing changes without a decision.
-    _render_strategy_section(request, brief)
 
     # The Gig Passport is built from the current draft. It is only ever saved by
     # publishing - never automatically.
     passport = fairscope.build_passport(brief, request)
 
+    summary_left, summary_right = st.columns([1.3, 1], gap="medium")
+    with summary_left:
+        ui_common.panel(
+            "Agreed scope",
+            "Built from your draft; edit anything below",
+            body=ui_common.key_values(
+                [
+                    ("Title", ui_common.gig_title(brief)),
+                    ("Budget (INR)", f"{float(request.get('budget') or 0):,.0f}"),
+                    ("Deadline", str(request.get("deadline") or "Not provided")),
+                ]
+            ),
+            footer=ui_common.tags(ui_common.gig_skills(brief), limit=6),
+            fill=True,
+        )
+    with summary_right:
+        ui_common.panel(
+            "Before you publish",
+            "Resolve, or acknowledge what is still missing",
+            body=ui_common.key_values(_passport_readiness(passport)),
+            footer=ui_common.tags(["Nothing publishes silently"]),
+            fill=True,
+        )
+
+    # The narration sits on its own row so it never disturbs the card heights.
+    ui_common.section_heading(
+        "Listen to this Gig Passport",
+        "A short spoken summary of exactly the scope a student would read. "
+        "Generated only when you ask for it.",
+    )
+    ui_common.voice_brief(
+        label="Listen to this Gig Passport",
+        text=voice_narration.build_passport_narration(
+            gig=st.session_state.get("published_record") or brief,
+            passport=passport,
+        ),
+        key="voice_passport",
+        caption="Built from this passport only - nothing is added.",
+    )
+
+    ui_common.header_rule()
     with st.form("brief_editor"):
-        st.markdown("#### Edit the brief")
+        st.markdown("#### Edit the brief and the Gig Passport")
         st.caption(
             "These fields become the published gig. Nothing below is confirmed until "
             "you edit it and publish."
@@ -355,23 +1016,23 @@ def _render_brief_editor(result: dict) -> None:
             key=f"brief_criteria_{revision}",
         )
 
-        st.divider()
-        st.caption(
-            "The AI's suggestions below are shown for context only. **You have not "
-            "confirmed them**, and they are not edited here."
-        )
-        st.markdown("**Clarifying questions (from the AI)**")
-        _bullet_list(list(brief.get("clarifying_questions") or []))
-        st.markdown("**Assumptions (from the AI)**")
-        _bullet_list(list(brief.get("assumptions") or []))
-        st.markdown("**Feasibility warnings (from the AI)**")
-        _bullet_list(list(brief.get("warnings") or []))
+        with st.expander("AI suggestions (context only - not confirmed)", expanded=False):
+            st.caption(
+                "The model's own notes. **You have not confirmed them**, and they are "
+                "not edited here."
+            )
+            st.markdown("**Clarifying questions**")
+            _bullet_list(list(brief.get("clarifying_questions") or []))
+            st.markdown("**Assumptions**")
+            _bullet_list(list(brief.get("assumptions") or []))
+            st.markdown("**Feasibility warnings**")
+            _bullet_list(list(brief.get("warnings") or []))
 
-        st.divider()
-        st.markdown("**Automatic checks**")
-        _show_findings(list(result.get("validation") or []))
+        with st.expander("Automatic checks", expanded=False):
+            _show_findings(list(result.get("validation") or []))
 
-        st.divider()
+        ui_common.header_rule()
+        st.markdown("#### Gig Passport sections")
         passport_values, acknowledged = _render_passport_editor(passport, revision)
 
         already_published = st.session_state.get("published_record") is not None
@@ -430,115 +1091,151 @@ def _render_fairscope_panel(request: dict, brief: dict) -> None:
     ai = analysis.get("ai_suggestions") or {}
     action = analysis.get("next_action") or {}
 
-    with st.container(border=True):
-        st.markdown("#### 🔍 FairScope review")
-        st.caption(
-            "**The AI drafts. Python checks. The business decides.** The **Python "
-            "checks** below are **deterministic**, and they stay separate from the "
-            "AI's own suggestions. FairScope never judges whether a budget is fair."
+    left, right = st.columns([1.15, 1], gap="medium")
+
+    # Deterministic checks on the left, in one card.
+    icons = {
+        fairscope.STATUS_OK: "✅",
+        fairscope.STATUS_NEEDS: "⚠️",
+        fairscope.STATUS_MISSING: "⛔",
+    }
+    check_rows = "".join(
+        '<div class="gs-check">'
+        f'<div class="gs-check-icon">{icons.get(check.get("status"), "•")}</div>'
+        '<div class="gs-check-body">'
+        f'<div class="gs-check-label">{_escape(str(check.get("label")))}</div>'
+        f'<div class="gs-check-detail">{_escape(str(check.get("detail")))}</div>'
+        "</div></div>"
+        for check in checks
+    )
+    with left:
+        ui_common.panel(
+            "Clarity check",
+            "The AI drafts. Python checks. You decide.",
+            body=check_rows or "<p>No checks were produced.</p>",
+            footer=ui_common.tags(["Deterministic", f"{len(checks)} check(s)"]),
+            fill=True,
         )
 
-        st.markdown("**Clarity check**")
-        icons = {
-            fairscope.STATUS_OK: "✅",
-            fairscope.STATUS_NEEDS: "⚠️",
-            fairscope.STATUS_MISSING: "⛔",
-        }
-        for check in checks:
-            icon = icons.get(check.get("status"), "•")
-            st.markdown(
-                '<div class="gs-check">'
-                f'<div class="gs-check-icon">{icon}</div>'
-                '<div class="gs-check-body">'
-                f'<div class="gs-check-label">{check.get("label")}</div>'
-                f'<div class="gs-check-detail">{check.get("detail")}</div>'
-                "</div></div>",
-                unsafe_allow_html=True,
-            )
+    # Deterministic signals above the model's own notes, clearly separated.
+    with right:
+        signal_rows = "".join(
+            f'<div class="gs-signal gs-signal--{_escape(str(f.get("level") or "info"))}">'
+            f'{_escape(str(f.get("message") or ""))}</div>'
+            for f in signals
+        )
+        ui_common.panel(
+            "Scope signals",
+            "Deterministic",
+            body=signal_rows or "<p>No scope signals were detected.</p>",
+            fill=True,
+        )
 
-        st.markdown("**Scope signals (deterministic)**")
-        if signals:
-            _show_findings(signals)
-        else:
-            st.caption("No scope signals were detected.")
-
-        st.markdown("**AI suggestions (from the model - not verified)**")
-        suggestions_shown = False
+        notes: list[str] = []
         for label, key in (
             ("Warnings", "warnings"),
             ("Assumptions", "assumptions"),
             ("Open questions", "questions"),
         ):
-            items = list(ai.get(key) or [])
+            items = [str(item) for item in (ai.get(key) or []) if str(item).strip()]
             if items:
-                suggestions_shown = True
-                st.markdown(f"*{label}:*")
-                _bullet_list(items)
-        if not suggestions_shown:
-            st.caption("The model added no extra notes.")
+                notes.append(
+                    f'<div class="gs-note-h">{_escape(label)}</div>' + ui_common.bullets(items)
+                )
+        ui_common.panel(
+            "AI suggestions",
+            "From the model · not verified",
+            body="".join(notes) or "<p>The model added no extra notes.</p>",
+            fill=True,
+        )
 
-        st.markdown("**Recommended next action**")
-        if action.get("summary"):
-            st.info(action["summary"])
-        for step in action.get("steps") or []:
-            st.markdown(f"- {step}")
+    # The recommended next action spans the width: it is the decision, not a detail.
+    if action.get("summary") or action.get("steps"):
+        steps = list(action.get("steps") or [])
+        ui_common.panel(
+            "Recommended next action",
+            "One clear next step, from Python",
+            body="<p>"
+            + _escape(str(action.get("summary") or ""))
+            + "</p>"
+            + (ui_common.bullets(steps) if steps else ""),
+            footer=ui_common.tags(["Not a judgement on your budget"]),
+        )
 
 
 # ---------------------------------------------------------------------------
 # Scope strategies: explicit, comparable, never applied automatically
 # ---------------------------------------------------------------------------
 def _render_strategy_section(request: dict, brief: dict) -> None:
-    with st.container(border=True):
-        st.markdown("#### 🧭 Scope strategies")
-        st.caption(
-            "Generate an alternative approach to compare with your current draft. "
-            "This asks the AI once, only when you click. Nothing is replaced or "
-            "published automatically."
-        )
+    ui_common.section_heading(
+        "Compare scope strategies",
+        "Generates an alternative to compare with your draft. This asks the AI once, "
+        "only when you click. Nothing is replaced or published automatically.",
+    )
 
-        options = [fairscope.strategy_meta(key)["label"] for key in fairscope.SCOPE_STRATEGY_KEYS]
+    options = [fairscope.strategy_meta(key)["label"] for key in fairscope.SCOPE_STRATEGY_KEYS]
+    col_choice, col_blurb, col_action = st.columns([1.1, 1.6, 1], gap="medium")
+    with col_choice:
         choice = st.selectbox("Choose a strategy", options, key="strategy_choice")
-        key = fairscope.SCOPE_STRATEGY_KEYS[options.index(choice)]
+    key = fairscope.SCOPE_STRATEGY_KEYS[options.index(choice)]
+    with col_blurb:
         st.caption(fairscope.strategy_meta(key)["blurb"])
-
-        if st.button("Generate this strategy version", key="strategy_generate"):
+    with col_action:
+        if st.button(
+            "Generate this strategy version",
+            key="strategy_generate",
+            use_container_width=True,
+        ):
             _generate_strategy_variant(request, brief, key)
 
-        variant = st.session_state.get("scope_variant")
-        if isinstance(variant, dict):
-            _render_strategy_comparison(brief, variant, request)
+    variant = st.session_state.get("scope_variant")
+    if isinstance(variant, dict):
+        _render_strategy_comparison(brief, variant, request)
+
+
+def _variant_strategy(variant: dict) -> str:
+    """The strategy key a proposed version belongs to.
+
+    The model response records it as ``scope_strategy``. The key the business
+    actually chose is also stored alongside the variant, so the identity
+    survives a response that omits it. Returns ``""`` when there is genuinely
+    no strategy, so callers never print a fabricated label.
+    """
+    for candidate in (
+        variant.get("scope_strategy"),
+        variant.get("strategy"),
+        st.session_state.get("scope_variant_key"),
+    ):
+        value = str(candidate or "").strip()
+        if value:
+            return value
+    return ""
 
 
 def _render_strategy_comparison(current: dict, variant: dict, request: dict) -> None:
     proposed = variant.get("brief") or {}
-    label = fairscope.strategy_label(variant.get("strategy"))
+    strategy_key = _variant_strategy(variant)
+    label = fairscope.strategy_label(strategy_key) if strategy_key else "Proposed version"
 
-    st.divider()
-    st.markdown(f"**Proposed: {label}**")
-    st.caption(
-        "This is only a proposal. Your current draft is unchanged until you choose it."
+    ui_common.panel(
+        f"Proposed: {label}",
+        "Only a proposal — your current draft is unchanged until you choose it",
+        body=ui_common.bullets(
+            [
+                f"Objective: {proposed.get('objective') or '_(none)_'}",
+            ]
+        )
+        + _strategy_deliverables_block(proposed)
+        + "<div class='gs-note-h'>What changed</div>"
+        + (ui_common.bullets(_brief_changes(current, proposed))
+           if _brief_changes(current, proposed)
+           else "<p>No field-level differences could be detected.</p>"),
+        footer=ui_common.tags(
+            [f"Strategy: {strategy_key}"] if strategy_key else ["Strategy not recorded"]
+        ),
     )
 
-    left, right = st.columns(2)
-    with left:
-        st.markdown("##### Your current draft")
-        st.markdown(f"**Objective:** {current.get('objective') or '_(none)_'}")
-        st.markdown("**Deliverables**")
-        _bullet_list(list(current.get("deliverables") or []))
-    with right:
-        st.markdown("##### Proposed version")
-        st.markdown(f"**Objective:** {proposed.get('objective') or '_(none)_'}")
-        st.markdown("**Deliverables**")
-        _bullet_list(list(proposed.get("deliverables") or []))
-
-    st.markdown("**What changed**")
-    changes = _brief_changes(current, proposed)
-    if changes:
-        _bullet_list(changes)
-    else:
-        st.caption("No field-level differences could be detected.")
-
-    col_use, col_discard = st.columns(2)
+    col_use, col_discard = st.columns(2, gap="medium")
     with col_use:
         if st.button(
             "Use this proposed version as my draft",
@@ -553,8 +1250,22 @@ def _render_strategy_comparison(current: dict, variant: dict, request: dict) -> 
             use_container_width=True,
             key="strategy_discard",
         ):
-            st.session_state["scope_variant"] = None
-            st.rerun()
+            _discard_strategy_variant()
+
+
+def _strategy_deliverables_block(brief: dict) -> str:
+    """Deliverables for the comparison panel, as escaped markup."""
+    items = [str(item) for item in (brief.get("deliverables") or []) if str(item).strip()]
+    if not items:
+        return ""
+    return "<div class='gs-note-h'>Deliverables</div>" + ui_common.bullets(items)
+
+
+def _discard_strategy_variant() -> None:
+    """Drop the proposal and its strategy identity, keeping the draft intact."""
+    st.session_state["scope_variant"] = None
+    st.session_state["scope_variant_key"] = None
+    st.rerun()
 
 
 def _brief_changes(current: dict, proposed: dict) -> list[str]:
@@ -583,10 +1294,12 @@ def _apply_strategy_variant(variant: dict) -> None:
     result["brief"] = variant.get("brief") or {}
     result["validation"] = variant.get("validation") or []
     result["problems"] = variant.get("problems") or []
-    if variant.get("strategy"):
-        result["scope_strategy"] = variant["strategy"]
+    strategy_key = _variant_strategy(variant)
+    if strategy_key:
+        result["scope_strategy"] = strategy_key
     st.session_state["brief_result"] = result
     st.session_state["scope_variant"] = None
+    st.session_state["scope_variant_key"] = None
     st.session_state["draft_key"] = str(uuid4())
     st.session_state["published_record"] = None
     st.session_state["published_draft_key"] = None
@@ -616,6 +1329,9 @@ def _generate_strategy_variant(request: dict, brief: dict, strategy_key: str) ->
         return
 
     st.session_state["scope_variant"] = variant
+    # The chosen key is recorded next to the variant so the comparison heading
+    # and the accept action always agree with what was actually selected.
+    st.session_state["scope_variant_key"] = strategy_key
     st.rerun()
 
 
@@ -734,10 +1450,13 @@ def _handle_publish(brief: dict, request: dict, passport: dict | None = None) ->
 
 
 # ---------------------------------------------------------------------------
-# Saved gigs (business view)
+# Published gigs
 # ---------------------------------------------------------------------------
 def _render_saved_gigs() -> None:
-    st.markdown("#### 📁 Saved gigs")
+    ui_common.section_heading(
+        "Saved gigs",
+        "What you publish is stored locally and becomes visible to students.",
+    )
     try:
         gigs = storage.load_gigs()
     except storage.StorageError as error:
@@ -747,27 +1466,39 @@ def _render_saved_gigs() -> None:
     published = [gig for gig in gigs if not gig.get("sample")]
     samples = [gig for gig in gigs if gig.get("sample")]
 
-    st.caption(f"{len(published)} published · {len(samples)} labelled sample gig(s)")
+    query = str(st.session_state.get("gs_search") or "").strip().lower()
+    if query:
+        published = [
+            gig
+            for gig in published
+            if query in ui_common.gig_title(gig).lower()
+            or query in ui_common.gig_context(gig).lower()
+            or any(query in skill.lower() for skill in ui_common.gig_skills(gig))
+        ]
 
     if published:
-        for gig in published:
-            title = gig.get("title") or "Untitled gig"
-            status = gig.get("status") or "open"
-            st.markdown(f"- **{title}** · ID `{gig.get('id')}` · status: {status}")
+        st.caption(f"{len(published)} published gig(s) on this device.")
+        _gig_grid(published)
     else:
-        st.caption("Nothing published yet. Published gigs will appear here.")
+        ui_common.empty_state(
+            "▤",
+            "Nothing published yet" if not query else "No saved gig matches that search",
+            "Published gigs will appear here and in the student listing. Use Create with "
+            "AI to publish your first one.",
+        )
 
     if samples:
-        with st.expander(f"Sample gigs ({len(samples)})"):
+        with st.expander(f"Sample gigs ({len(samples)}) — labelled examples, not real requests"):
             st.caption(
                 "Labelled examples that ship with Gigsie. They are **not** real "
                 "businesses or real requests."
             )
-            for gig in samples:
-                title = gig.get("title") or "Untitled gig"
-                st.markdown(
-                    f"- {title} " + ui_common.sample_tag(), unsafe_allow_html=True
-                )
+            _gig_grid(samples)
+
+
+def _gig_grid(gigs: list[dict]) -> None:
+    """Render saved gigs as equal-height cards, one real row at a time."""
+    ui_common.gig_grid([ui_common.gig_card(gig, fill=True) for gig in gigs])
 
 
 # ---------------------------------------------------------------------------
@@ -802,8 +1533,8 @@ def _show_findings(findings: list) -> None:
 # ---------------------------------------------------------------------------
 def main() -> None:
     st.set_page_config(
-        page_title="Gigsie Scope Studio",
-        page_icon="🧩",
+        page_title="Gigsie — clear, achievable freelance gigs",
+        page_icon="◆",
         layout="wide",
         initial_sidebar_state="expanded",
     )
@@ -819,11 +1550,12 @@ def main() -> None:
 
     ui_common.nav_sidebar()
 
-    view = st.session_state.get("view", ui_common.VIEW_HOME)
+    view = ui_common.current_view()
+    section = ui_common.current_section()
     if view == ui_common.VIEW_BUSINESS:
-        render_business()
+        render_business(section)
     elif view == ui_common.VIEW_STUDENT:
-        render_student()
+        render_student(section)
     else:
         render_landing()
 

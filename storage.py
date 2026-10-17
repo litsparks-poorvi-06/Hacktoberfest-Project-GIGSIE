@@ -189,31 +189,87 @@ def get_gig(gig_id: str, data_dir: Path | None = None) -> dict[str, Any] | None:
     return None
 
 
-def seed_samples_on_first_run(data_dir: Path | None = None) -> list[dict[str, Any]]:
-    """Create ``gigs.json`` from the sample file the first time the app runs.
+def _sample_records(data_dir: Path | None = None) -> list[dict[str, Any]]:
+    """Build the labelled sample gigs from the shipped sample file.
 
-    If a gigs file already exists, it is left untouched. Returns the current gigs.
+    Each record is marked ``sample`` and given a stable id, status, and created
+    timestamp when the sample file does not provide them. The sample file ships
+    fixed ids, so refreshing never orphans an application that points at one.
     """
-    path = _gigs_path(data_dir)
-    if path.exists():
-        return load_gigs(data_dir)
-
     samples = _read_json(_samples_path(data_dir))
     if samples is None:
         samples = []
     samples = _expect_list(samples, _samples_path(data_dir))
 
-    seeded: list[dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     for item in samples:
         record = dict(item)
         record["sample"] = True
         record.setdefault("status", "open")
         record.setdefault("id", _new_id("g"))
         record.setdefault("created_at", _now())
-        seeded.append(record)
+        records.append(record)
+    return records
 
-    _write_json(path, seeded)
-    return seeded
+
+def _refresh_sample_records(
+    gigs: list[dict[str, Any]], data_dir: Path | None = None
+) -> list[dict[str, Any]]:
+    """Return ``gigs`` with only its ``sample`` entries refreshed from the file.
+
+    Real (non-sample) gigs keep their content and relative order. A sample keeps
+    its original ``created_at`` so repeated refreshes are stable, and any sample
+    that is no longer shipped is dropped. New samples are appended at the end.
+    """
+    fresh = {sample["id"]: sample for sample in _sample_records(data_dir)}
+
+    result: list[dict[str, Any]] = []
+    seen: set[Any] = set()
+    for gig in gigs:
+        if not gig.get("sample"):
+            result.append(gig)
+            continue
+        replacement = fresh.get(gig.get("id"))
+        if replacement is None:
+            continue  # a sample that is no longer shipped
+        replacement["created_at"] = gig.get("created_at") or replacement.get("created_at")
+        result.append(replacement)
+        seen.add(gig.get("id"))
+
+    for sample in fresh.values():
+        if sample["id"] not in seen:
+            result.append(sample)
+    return result
+
+
+def seed_samples_on_first_run(data_dir: Path | None = None) -> list[dict[str, Any]]:
+    """Make the labelled sample gigs available through local storage.
+
+    * On the very first run (no gigs file) the gigs file is created from the
+      shipped sample file.
+    * On later runs, only records explicitly marked ``sample`` are refreshed to
+      match the shipped file, so the labelled examples stay current. **Real gigs
+      are never modified** - a file the user created themselves is left entirely
+      untouched. The refresh is idempotent and does not rewrite the file when
+      nothing changed.
+
+    Returns the current gigs.
+    """
+    path = _gigs_path(data_dir)
+    if not path.exists():
+        seeded = _sample_records(data_dir)
+        _write_json(path, seeded)
+        return seeded
+
+    gigs = load_gigs(data_dir)
+    if not any(gig.get("sample") for gig in gigs):
+        # The user's own file: never add or change anything.
+        return gigs
+
+    refreshed = _refresh_sample_records(gigs, data_dir)
+    if refreshed != gigs:
+        save_gigs(refreshed, data_dir)
+    return refreshed
 
 
 # ---------------------------------------------------------------------------
