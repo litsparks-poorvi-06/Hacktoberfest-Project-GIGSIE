@@ -7,7 +7,7 @@
     "desired_outcome": "More local families know the new menu is available and visit the shop this week.",
     "budget_inr": 800,
     "deadline": "2 days",
-    "additional_context": "We already post occasionally on Instagram. Most customers are nearby families with young children.",
+    "additional_context": "We already post occasionally on Instagram. Most customers are nearby families with young children. The amounts are illustrative example assumptions, not verified market rates.",
     "required_skills": [
       "Canva",
       "Copywriting"
@@ -39,7 +39,8 @@
       ],
       "warnings": [
         "Two days is a short window if the menu photos still need to be taken",
-        "The number of small text changes wanted is not yet specified"
+        "The number of small text changes wanted is not yet specified",
+        "The budget and deadline shown are illustrative example assumptions for this sample gig, not verified market rates."
       ],
       "exclusions": [
         "No paid advertising or boosted posts",
@@ -67,7 +68,7 @@
     "desired_outcome": "Parents can quickly understand what we offer and contact us from any device.",
     "budget_inr": 2500,
     "deadline": "1 week",
-    "additional_context": "We can provide all the text, our phone number, and a few photos. We do not have a logo yet.",
+    "additional_context": "We can provide all the text, our phone number, and a few photos. We do not have a logo yet. The amounts are illustrative example assumptions, not verified market rates.",
     "required_skills": [
       "HTML",
       "CSS",
@@ -102,7 +103,8 @@
       ],
       "warnings": [
         "Adding online booking or payments later would be a separate, larger task",
-        "There is no logo yet, so a simple text header will be used"
+        "There is no logo yet, so a simple text header will be used",
+        "The budget and deadline shown are illustrative example assumptions for this sample gig, not verified market rates."
       ],
       "exclusions": [
         "No online booking or payment system",
@@ -130,7 +132,7 @@
     "desired_outcome": "Customers can understand each item before visiting, without asking us basic questions.",
     "budget_inr": 1200,
     "deadline": "3 days",
-    "additional_context": "We can send a list of the ten items with their fabric, colour, and size. We do not have professional photos.",
+    "additional_context": "We can send a list of the ten items with their fabric, colour, and size. We do not have professional photos. The amounts are illustrative example assumptions, not verified market rates.",
     "required_skills": [
       "Copywriting",
       "Attention to detail"
@@ -162,7 +164,8 @@
       ],
       "warnings": [
         "The work cannot be completed until the item details are supplied",
-        "Price wording is left out unless the shop confirms it"
+        "Price wording is left out unless the shop confirms it",
+        "The budget and deadline shown are illustrative example assumptions for this sample gig, not verified market rates."
       ],
       "exclusions": [
         "No full e-commerce website",
@@ -184,57 +187,65 @@
   },
   {
     "id": "g_sample_0004",
-    "title": "A simple service price list for a plumbing business",
-    "business_name": "QuickFix Plumbing",
-    "work_needed": "We want a clear one-page price list of our common services that we can print and send to customers.",
-    "desired_outcome": "Customers understand our common services and starting prices before they call.",
-    "budget_inr": 900,
-    "deadline": "2 days",
-    "additional_context": "We can give you the list of services and starting prices. These are example terms for a sample gig.",
+    "title": "A short slide deck for a local business",
+    "business_name": "Sundara Coffee House",
+    "work_needed": "We open a new branch and need a short slide deck we can show at a community meet-up and hand to potential suppliers.",
+    "desired_outcome": "People leave knowing what the new branch sells, when it is open, and how to find it.",
+    "budget_inr": 1500,
+    "deadline": "4 days",
+    "additional_context": "We can supply the branch address, opening hours, menu summary, and two photographs. Those amounts are example assumptions for a sample gig. The amounts are illustrative example assumptions, not verified market rates.",
     "required_skills": [
-      "Document formatting",
-      "Copywriting"
+      "Presentation design",
+      "Copy editing",
+      "Layout"
     ],
     "brief": {
-      "objective": "Create a clear one-page service price list for a small plumbing business using the services and starting prices the owner supplies.",
+      "objective": "Lay out a short, plain slide deck that explains one new branch of a small coffee business, using only information the owner supplies.",
       "deliverables": [
-        "One one-page price list as a PDF",
-        "An editable version (for example a DOCX) so the owner can change prices later",
-        "A neat table with a Service column and a Starting price column"
+        "One eight-slide deck, delivered as an editable PPTX and a PDF, covering: title, what we sell, opening hours, location, three product highlights, contact, and closing",
+        "The two owner-supplied photographs placed on the location slide and one product-highlight slide, plus one or two lines of speaker notes on every slide",
+        "One plain checklist listing any information the owner still needs to supply"
       ],
       "required_skills": [
-        "Document formatting",
-        "Copywriting"
+        "Presentation design",
+        "Copy editing",
+        "Layout"
       ],
       "clarifying_questions": [
-        "Which services and starting prices should the list include?",
-        "Should an emergency call-out rate be listed separately?",
-        "What phone number and service area should appear at the top?"
+        "Which three products should the product-highlight slides cover?",
+        "Should prices appear on the slides, or only the opening hours?",
+        "Will the deck be shown on a projector, a laptop, or printed as a handout?"
       ],
       "acceptance_criteria": [
-        "The price list fits on one page and is easy to read",
-        "Every service and starting price matches the owner's list exactly",
-        "Both a PDF and an editable file are delivered"
+        "The deck is exactly eight slides and matches the agreed slide list",
+        "Every fact on a slide matches the owner-supplied information exactly, and each slide carries one clear message readable at normal viewing distance",
+        "Both an editable PPTX and a PDF are delivered, with speaker notes on every slide"
       ],
       "assumptions": [
-        "The owner supplies the services and starting prices",
-        "A simple one-page document is enough; no website is needed"
+        "The owner supplies the address, hours, menu summary, and photographs",
+        "One branch only; no branch comparison or growth story is included",
+        "No data, charts, or financial figures are needed"
       ],
       "warnings": [
-        "The example prices are illustrative and are not verified market rates",
-        "The work cannot be finished until the owner confirms the service list"
+        "The illustrative budget is an example assumption and is not a verified market rate",
+        "Work cannot start until the owner supplies the information and photographs",
+        "Printing costs are not included"
       ],
       "exclusions": [
-        "No website or online booking",
-        "No legal contract wording",
-        "No logo design"
+        "No video, animation, or custom graphics",
+        "No brand identity, logo, or colour-guide work",
+        "No market research, sales figures, or promotional campaign",
+        "No ongoing editing after the agreed revision round"
       ],
       "client_responsibilities": [
-        "Provide the services and starting prices to display",
-        "Confirm the phone number and service area at the top of the page"
+        "Supply the branch address, opening hours, and menu summary as plain text",
+        "Supply two photographs that may be used in the deck",
+        "Confirm the three products to highlight and whether prices appear",
+        "Say how the deck will be shown, so the layout can suit it"
       ],
       "revision_expectations": [
-        "One round of price or wording corrections"
+        "One round of wording and layout corrections",
+        "Corrections to owner-supplied information are treated as the same round"
       ]
     },
     "status": "open",

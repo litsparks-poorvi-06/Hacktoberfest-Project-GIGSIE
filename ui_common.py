@@ -31,7 +31,6 @@ from typing import Any
 import streamlit as st
 
 import validation
-import voice_narration as voice
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +160,8 @@ _CSS = """
     }
 
     /* --- Typography ----------------------------------------------------- */
-    html, body, [class*="st-"], button, input, textarea, select {
+    html, body, [class*="st-"]:not([data-testid="stIconMaterial"]),
+    button, input, textarea, select {
         font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
         color: var(--gs-ink);
     }
@@ -174,6 +174,27 @@ _CSS = """
     h4 { font-weight: 700; }
     p, li { line-height: 1.55; }
     a { color: var(--gs-brand); text-decoration: none; }
+
+    /* Streamlit styles its own headings with a single-class emotion selector
+       (Source Sans, 2.75rem for h1). That ties with a bare class selector on
+       specificity and then wins on source order, so headings rendered from
+       markdown ignored this stylesheet entirely. These rules are scoped to the
+       content area, which outranks the emotion class, and sit before the
+       component rules below so `.gs-job h4` and friends still win for cards. */
+    [data-testid="stMainBlockContainer"] h1:not([class]),
+    [data-testid="stMainBlockContainer"] h2:not([class]),
+    [data-testid="stMainBlockContainer"] h3:not([class]),
+    [data-testid="stMainBlockContainer"] h4:not([class]),
+    [data-testid="stMainBlockContainer"] h5:not([class]) {
+        font-family: "Plus Jakarta Sans", "Inter", "Segoe UI", Arial, sans-serif;
+        letter-spacing: -0.02em;
+        color: var(--gs-ink);
+    }
+    [data-testid="stMainBlockContainer"] h1:not([class]) { font-size: 1.35rem; font-weight: 800; }
+    [data-testid="stMainBlockContainer"] h2:not([class]) { font-size: 1.12rem; font-weight: 750; }
+    [data-testid="stMainBlockContainer"] h3:not([class]) { font-size: 1rem; font-weight: 700; }
+    [data-testid="stMainBlockContainer"] h4:not([class]) { font-size: 0.95rem; font-weight: 700; }
+    [data-testid="stMainBlockContainer"] h5:not([class]) { font-size: 0.9rem; font-weight: 700; }
 
     /* --- Canvas and the inset app shell --------------------------------- */
     [data-testid="stAppViewContainer"] {
@@ -211,30 +232,15 @@ _CSS = """
     }
     /* Streamlit's own sidebar header only holds the logo spacer and the collapse
        button. Lift the button out of the flow so the card starts at the top. */
+    /* Streamlit's own sidebar header only holds the logo spacer and the collapse
+       button. Both are removed: the wordmark below is the header, and a collapse
+       control would let the primary navigation disappear. */
     section[data-testid="stSidebar"] div[data-testid="stSidebarHeader"] {
-        position: absolute;
-        top: 18px;
-        right: 6px;
-        width: auto;
-        height: auto;
-        margin: 0;
-        z-index: 6;
-        background: transparent;
-        border: none;
-        display: flex;
-        align-items: center;
+        display: none;
     }
     section[data-testid="stSidebar"] div[data-testid="stSidebarLogoSpacer"] {
         display: none;
     }
-    section[data-testid="stSidebar"] div[data-testid="stSidebarCollapseButton"] button {
-        background: rgba(255, 255, 255, 0.7);
-        border: 1px solid var(--gs-line);
-        border-radius: 9px;
-        width: 28px;
-        height: 28px;
-    }
-    section[data-testid="stSidebarCollapsedControl"] { display: none; }
 
     /* The content area is the white card of the shell. The width is capped so a
        wide window does not stretch body text into unreadable line lengths. */
@@ -279,24 +285,52 @@ _CSS = """
     }
     .gs-nav-label:first-of-type { margin-top: 0.2rem; }
 
-    /* --- The sidebar is permanent navigation, so it stays open -----------
-       Streamlit auto-collapses it on narrow viewports and offers a collapse
-       control; either one hides the primary navigation. */
-    section[data-testid="stSidebarCollapseButton"],
-    button[data-testid="stSidebarCollapsedControl"] { display: none !important; }
+    /* The sidebar is the primary navigation, so it opens expanded and its
+       toggle is styled to match the shell rather than removed.
+
+       It is deliberately NOT hidden: Streamlit remembers the collapsed state in
+       the browser, so hiding both the collapse button and the expand control can
+       strand a returning user with no way back to the navigation at all. */
+    section[data-testid="stSidebar"] div[data-testid="stSidebarCollapseButton"] button,
+    div[data-testid="stExpandSidebarButton"] button,
+    button[data-testid="stExpandSidebarButton"] {
+        background: rgba(255, 255, 255, 0.75);
+        border: 1px solid var(--gs-line-2);
+        border-radius: 9px;
+        color: var(--gs-ink-2);
+        width: 30px;
+        height: 30px;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stSidebarCollapseButton"] button:hover,
+    div[data-testid="stExpandSidebarButton"] button:hover,
+    button[data-testid="stExpandSidebarButton"]:hover {
+        background: #fff;
+        color: var(--gs-brand-ink);
+        border-color: var(--gs-brand-2);
+    }
+    /* Streamlit's own header only holds the logo spacer; drop the empty space
+       but keep the toggle in the flow so it stays clickable. */
+    section[data-testid="stSidebar"] div[data-testid="stSidebarLogoSpacer"] {
+        display: none;
+    }
     section[data-testid="stSidebar"] {
+        /* Forced, because this sidebar *is* the navigation: on a narrow window
+           Streamlit slides it away, and that must never be able to strand the
+           user with no way to reach another page. The toggle is still visible
+           above, so the layout never fights the user. */
         min-width: 248px !important;
         width: 248px !important;
+        max-width: 248px !important;
+        transform: none !important;
     }
-    section[data-testid="stSidebar"] > div,
-    section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"],
-    section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div {
-        min-height: 100%;
-    }
-    /* The nav stays at the top; the honest footer sits at the bottom, so the
+    /* The expand affordance Streamlit shows in the top header when it thinks the
+       sidebar is collapsed: keep it on-brand and clickable. */
+    section[data-testid="stSidebar"] div[data-testid="stSidebarCollapseButton"],
+    [data-testid="stExpandSidebarButton"] { display: flex !important; }
+    /* The nav stays at the top and the honest footer sits at the bottom, so the
        space between them reads as deliberate rather than as a blank panel. */
     section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div {
-        display: flex; flex-direction: column;
+        display: flex; flex-direction: column; min-height: 100%;
     }
     section[data-testid="stSidebar"] .gs-sidebar-foot { margin-top: auto; }
 
@@ -390,9 +424,27 @@ _CSS = """
     .gs-display .off { color: #c9c5da; }
     .gs-display .mid { color: #8d88a8; }
     .gs-page-head { margin: 0 0 0.85rem; }
-    .gs-page-title {
-        margin: 0.1rem 0 0; font-size: 1.3rem; font-weight: 800;
+    /* Scoped so it outranks Streamlit's own h1 styling, which is injected
+       after this stylesheet and would otherwise render the title at 2.75rem. */
+    [data-testid="stMainBlockContainer"] .gs-page-title {
+        margin: 0.1rem 0 0; font-size: 1.35rem; font-weight: 800;
         letter-spacing: -0.02em;
+        font-family: "Plus Jakarta Sans", "Inter", "Segoe UI", Arial, sans-serif;
+        color: var(--gs-ink);
+    }
+    [data-testid="stMainBlockContainer"] .gs-display {
+        font-family: "Plus Jakarta Sans", "Inter", "Segoe UI", Arial, sans-serif;
+        /* Scoped so Streamlit's own h1 sizing (2.75rem, injected later) loses. */
+        font-size: 1.7rem;
+        line-height: 1.15;
+        font-weight: 800;
+        margin: 0 0 0.1rem;
+    }
+    [data-testid="stMainBlockContainer"] .gs-section-title {
+        font-family: "Plus Jakarta Sans", "Inter", "Segoe UI", Arial, sans-serif;
+    }
+    [data-testid="stMainBlockContainer"] .gs-panel-title {
+        font-family: "Plus Jakarta Sans", "Inter", "Segoe UI", Arial, sans-serif;
     }
     .gs-page-sub {
         margin: 0.3rem 0 0; color: var(--gs-muted);
@@ -405,11 +457,6 @@ _CSS = """
     }
     .gs-section-caption {
         color: var(--gs-muted); font-size: 0.86rem; margin-bottom: 0.6rem;
-    }
-    .gs-voice-note {
-        font-size: 0.8rem; color: var(--gs-muted);
-        background: var(--gs-surface-2); border: 1px dashed var(--gs-line-2);
-        border-radius: var(--gs-radius-xs); padding: 0.5rem 0.7rem;
     }
 
     /* --- Metric tiles (reference: small label, big number, muted hint) --- */
@@ -566,6 +613,11 @@ _CSS = """
     .gs-job-meta { color: var(--gs-muted); font-size: 0.79rem; }
 
     /* --- Table (reference data table) ------------------------------------ */
+    .gs-table-wrap {
+        border: 1px solid var(--gs-line);
+        border-radius: var(--gs-radius);
+        overflow-x: auto;
+    }
     .gs-table { width: 100%; border-collapse: collapse; font-size: 0.89rem; }
     .gs-table th {
         text-align: left; font-weight: 650; color: var(--gs-ink-2);
@@ -789,6 +841,34 @@ _CSS = """
         border: 1px solid var(--gs-line); border-radius: var(--gs-radius-sm);
         background: var(--gs-surface); box-shadow: var(--gs-shadow-sm);
     }
+    /* Streamlit's expander chevron is a Material Symbols *ligature*: the literal
+       word "keyboard_arrow_right" is the glyph, and the icon webfont is not
+       always reachable (offline, blocked CDN). Combined with the font override
+       above, that word rendered as visible text on top of the expander label and
+       widened the row. The ligature is removed entirely and replaced with a
+       CSS-drawn chevron inside a fixed-size box, so it works either way and
+       contributes no width. */
+    span[data-testid="stIconMaterial"] {
+        display: none;
+        font-family: initial !important;
+    }
+    div[data-testid="stExpander"] summary > span:first-child {
+        position: relative;
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 1.15rem; height: 1.15rem; flex-shrink: 0;
+    }
+    div[data-testid="stExpander"] summary > span:first-child::after {
+        content: ""; position: absolute; left: 50%; top: 50%;
+        width: 7px; height: 7px; margin: -5px 0 0 -4px;
+        border-right: 2px solid var(--gs-muted);
+        border-bottom: 2px solid var(--gs-muted);
+        transform: rotate(-45deg);
+        transition: transform 0.15s ease;
+    }
+    div[data-testid="stExpander"] details[open] summary > span:first-child::after {
+        transform: rotate(45deg);
+    }
+    div[data-testid="stExpander"] summary { cursor: pointer; }
     div[data-testid="stAlert"] {
         border-radius: var(--gs-radius-sm); border: 1px solid var(--gs-line);
         box-shadow: none;
@@ -1151,51 +1231,6 @@ def search_query(key: str, items: list[str], empty_text: str = "") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Gigsie Voice Brief (ElevenLabs)
-# ---------------------------------------------------------------------------
-def voice_brief(*, label: str, text: str, key: str, caption: str = "") -> None:
-    """Render the on-demand Voice Brief action and its player.
-
-    Nothing is generated until the user clicks. The audio is cached in session
-    state under a hash of the text, voice, and model, so an ordinary rerun or a
-    second click reuses the same clip and never spends another request. Changing
-    the text, the voice, or the model changes the key and invalidates the cache.
-
-    When ElevenLabs is not configured the action is replaced by a quiet setup
-    note; the rest of the page is unaffected.
-    """
-    if not (text or "").strip():
-        return
-
-    if not voice.is_configured():
-        st.markdown(
-            f'<div class="gs-voice-note">{_txt(voice.configuration_note())}</div>',
-            unsafe_allow_html=True,
-        )
-        return
-
-    cache_key = f"{key}__{voice.narration_cache_key(text)}"
-    audio = st.session_state.get(cache_key)
-
-    if st.button(label, key=f"{key}_btn", use_container_width=True):
-        try:
-            with st.spinner("Narrating the scope Gigsie produced..."):
-                audio = voice.synthesize(text)
-            st.session_state[cache_key] = audio
-        except voice.VoiceBriefError as error:
-            audio = None
-            st.session_state[f"{key}__error"] = str(error)
-
-    problem = st.session_state.get(f"{key}__error")
-    if problem:
-        st.error(problem)
-    elif audio:
-        st.audio(audio, format="audio/mpeg")
-        if caption:
-            st.caption(caption)
-
-
-# ---------------------------------------------------------------------------
 # Headings
 # ---------------------------------------------------------------------------
 def eyebrow(text: str) -> None:
@@ -1386,8 +1421,10 @@ def data_table(headers: list[str], rows: list[list[str]]) -> None:
         "<tr>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>" for row in rows
     )
     st.markdown(
-        '<div style="border:1px solid var(--gs-line);border-radius:var(--gs-radius);'
-        'overflow:hidden">'
+        # `overflow-x: auto` rather than hidden: a table has a minimum width, and
+        # clipping it would silently drop columns instead of letting the reader
+        # scroll to them.
+        '<div class="gs-table-wrap">'
         f'<table class="gs-table"><thead><tr>{head}</tr></thead>'
         f"<tbody>{body}</tbody></table></div>",
         unsafe_allow_html=True,

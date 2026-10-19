@@ -48,7 +48,6 @@ import fairscope
 import interviews
 import storage
 import ui_common
-import voice_narration
 
 TAGLINE = ui_common.TAGLINE
 PRODUCT_BLURB = (
@@ -703,24 +702,13 @@ def _render_fairscope_review(result: dict) -> None:
     _render_strategy_section(request, brief)
 
     ui_common.header_rule()
-    left_btn, right_note = st.columns([1, 1.6], gap="medium", vertical_alignment="center")
-    with left_btn:
-        if st.button(
-            "Continue to the Gig Passport",
-            type="primary",
-            use_container_width=True,
-            key="continue_to_passport",
-        ):
-            _go(ui_common.VIEW_BUSINESS, ui_common.SEC_PASSPORT)
-    with right_note:
-        ui_common.voice_brief(
-            label="Listen to FairScope",
-            text=voice_narration.build_fairscope_narration(
-                brief=brief, request=request, analysis=analysis
-            ),
-            key="voice_fairscope",
-            caption="A spoken summary of the draft above, built from the same fields.",
-        )
+    if st.button(
+        "Continue to the Gig Passport",
+        type="primary",
+        use_container_width=True,
+        key="continue_to_passport",
+    ):
+        _go(ui_common.VIEW_BUSINESS, ui_common.SEC_PASSPORT)
 
     if st.button("Start a new brief", key="new_brief"):
         _reset_draft()
@@ -969,22 +957,6 @@ def _render_brief_editor(result: dict) -> None:
             footer=ui_common.tags(["Nothing publishes silently"]),
             fill=True,
         )
-
-    # The narration sits on its own row so it never disturbs the card heights.
-    ui_common.section_heading(
-        "Listen to this Gig Passport",
-        "A short spoken summary of exactly the scope a student would read. "
-        "Generated only when you ask for it.",
-    )
-    ui_common.voice_brief(
-        label="Listen to this Gig Passport",
-        text=voice_narration.build_passport_narration(
-            gig=st.session_state.get("published_record") or brief,
-            passport=passport,
-        ),
-        key="voice_passport",
-        caption="Built from this passport only - nothing is added.",
-    )
 
     ui_common.header_rule()
     with st.form("brief_editor"):

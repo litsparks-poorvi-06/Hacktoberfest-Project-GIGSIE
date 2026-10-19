@@ -37,7 +37,6 @@ Gigsie separates the model's job from Python's job on purpose:
 | Business logic | `gig_workflow.py` | Form validation, record building, and safe publishing (at most once per draft). |
 | Local storage | `storage.py` | Saves and loads gigs, passports, profiles, applications, assessments, interviews from JSON. |
 | Student backend | `profiles.py`, `applications.py`, `assessments.py`, `interviews.py` | Profile rules, proposal validation/dedupe/status, Python grading, interview status. |
-| Voice Brief | `voice_narration.py` | Builds a spoken summary from the real brief/Gig Passport and calls ElevenLabs TTS. Optional. |
 | Interface & flow | `app.py`, `student_ui.py`, `business_ui.py`, `ui_common.py` | Streamlit screens and the shared visual system. Presentation only. |
 
 - The model does the **language understanding**.
@@ -68,7 +67,6 @@ Gigsie/
 ├── applications.py     # Proposals: validation, dedupe, status lifecycle
 ├── assessments.py      # Practice assessments: validation and Python grading
 ├── interviews.py       # Interview status and scheduling details
-├── voice_narration.py   # Gigsie Voice Brief: ElevenLabs narration of the real scope
 ├── errors.py           # Shared workflow error type
 ├── tests/              # unittest suite (no real API calls; temporary data dirs)
 ├── data/               # Local JSON data + labelled sample gigs (git-ignored)
@@ -113,9 +111,6 @@ Gigsie/
    Copy-Item .env.example .env
    ```
 
-5. **Optional — the Gigsie Voice Brief.** To enable spoken scope summaries, also set these in
-   `.env` (see "Gigsie Voice Brief" below). Everything in Gigsie works without them.
-
 6. **Optional — confirm your key works:**
 
    ```powershell
@@ -144,7 +139,6 @@ Business side (*For businesses*):
    signals, kept separate from the model's own suggestions, plus a recommended next action.
 3. Optionally generate one **scope strategy** (Budget-first / Outcome-first / Milestone-first) and
    compare it with the current draft. Nothing is replaced or published until you choose it.
-4. **Listen to FairScope** — an optional spoken summary of exactly what is on screen.
 5. **Gig Passport** — its own page. Edit the brief, resolve or explicitly acknowledge anything still
    marked **Needs clarification**, then click **Publish gig** to save it.
 6. **Published Gigs** — everything saved on this device, with search, status, budget, and deadline.
@@ -159,15 +153,13 @@ Student side (*For students*):
 2. **My Profile** — create or edit the local profile; the checklist shows which basics are missing.
 3. **Find Work** — marketplace-style gig cards with title, outcome, budget, deadline, required
    skills, the published/SAMPLE label, and a real skill match. The detail view shows the same
-   Gig Passport the business approved, plus **Listen to this Gig Passport**. Write, review, and
+   Gig Passport the business approved. Write, review, and
    submit a proposal.
 4. **My Applications** — submitted proposals and their stored status.
 5. **Skill Assessments** and **Interviews** — secondary pages; neither is required before applying.
 
 The Streamlit UI, FairScope review, Gig Passport, strategies, student profile, proposals,
-assessments, interviews, and Voice Brief are all implemented and covered by the test suite. State
 inference (the brief and strategy revisions, and practice-assessment questions) runs through the
-Groq-hosted model and needs internet access. Voice Brief additionally needs ElevenLabs credentials
 and is entirely optional.
 
 ---
@@ -194,12 +186,10 @@ Verified behaviours:
 - The business flow, student profile/proposal flow, assessments, and interviews are exercised
   end-to-end through `streamlit.testing.v1.AppTest`.
 - Every sidebar destination renders its own real page and each one is clicked through in a test.
-- The Voice Brief is covered with mocks only: missing credentials, request construction, audio-byte
   handling, HTTP failure, timeout, **no request before the user asks**, no duplicate request on an
   ordinary rerun, cache invalidation when the text/voice/model changes, narration built from the
   real saved fields, and the core app working with no credentials at all.
 
-**The test suite never spends API credit.** ElevenLabs is mocked at the HTTP boundary and Groq is
 mocked at the function boundary; both real `.env` values are never read by the tests.
 
 If the API is unavailable or the key is missing, Gigsie reports the actual error message
@@ -223,7 +213,6 @@ rather than pretending to succeed.
   certification and never block applying.
 - Interview coordination is only the stored status: Gigsie does not host video calls, send emails
   or calendar invites, or provide messaging.
-- Voice Brief narration is a generated summary for comprehension, not an authoritative copy of the
   scope. The saved brief and Gig Passport remain the source of truth, and no audio is ever saved to
   disk.
 - All data is local JSON on one device. Multiple people "using" Gigsie on different machines do
@@ -274,6 +263,18 @@ available as an explicit choice. Selecting one calls the model **once** to revis
 the current draft; the original is never replaced or published automatically, and
 the original budget and deadline are preserved. A failed revision keeps the
 existing draft and shows a useful error.
+
+**Strategy identity is state, not a label.** `gigsie_ai.generate_task_brief`
+records the strategy it was asked for in `result["scope_strategy"]`. Gigsie stores
+that response in `st.session_state["scope_variant"]` and the key the business
+actually selected in `st.session_state["scope_variant_key"]`. The comparison
+heading, the accept action, and the published passport all read through one
+resolver, `_variant_strategy()`, so Budget-first always reads *Budget-first*. (An
+earlier build read a non-existent `strategy` key and therefore showed
+*Proposed: Unknown strategy*; that is fixed and covered by a regression test for
+all three strategies, including accept, discard, failed generation, and reruns.)
+Discarding or accepting a proposal clears both keys, and "Start a new brief"
+clears them too, so a stale identity can never leak into the next draft.
 
 The **Gig Passport** is an editable summary of the agreed scope (objective,
 deliverables, definition of done, included work, exclusions, required skills,
@@ -358,27 +359,38 @@ The interface is one dashboard-style workspace rather than a set of separate for
 system lives entirely in `ui_common.py` as scoped CSS over Streamlit's own components, so there
 are no new dependencies and nothing is a static mockup.
 
-**The shell.** A pale lavender canvas holds one inset white shell: a 268 px lavender sidebar on the
+**The shell.** A pale lavender canvas holds one inset white shell: a 248 px lavender sidebar on the
 left and a white content canvas with a compact header. The sidebar carries the Gigsie wordmark and
-eleven real destinations in four groups —
+nine real destinations in three groups —
 
 | Group | Destinations |
 |---|---|
 | Workspace | Overview |
-| For businesses | Create with AI, Gig Passport, Published Gigs, Applicants & Interviews |
-| For students | Student Overview, Find Work, My Profile, My Applications |
-| Grow | Skill Assessments, Interviews |
+| Business | Create with AI, Published Gigs, Applicants & Interviews |
+| Student | Find Work, My Profile, My Applications, Skill Assessments, Interviews |
 
-— plus an honest prototype footer. The active destination is highlighted. Every one of them
-performs real navigation; there are no decorative links. There is **no second navigation layer**
-inside pages: the student area no longer renders a horizontal tab bar, so the sidebar is the only
-way between views.
+— plus an honest prototype footer pinned to the bottom. The active destination is highlighted, and
+every one of them performs real navigation; there are no decorative links.
 
-**The header.** Each page opens with a breadcrumb and a *← Back to start* link, a Business/Student
-role switch that actually changes the workspace, a status chip that shows the real local student
+**One navigation system, and only one.** The sidebar is permanent: Streamlit's collapse control and
+the auto-collapse that happens on narrow viewports are both disabled, so navigation can never
+disappear. There is **no second navigation layer** anywhere — no horizontal tab bar in the student
+area, no in-page section switch, and the header carries **no** navigation control at all: the old
+*← Back to start* link and the Business/Student role switch were both removed because each
+duplicated a destination the sidebar already shows on every page. Gig Passport and Student Overview
+remain real routes, reached through the workflow rather than listed twice at the top level.
+
+**The header.** Each page opens with a breadcrumb, a status chip that shows the real local student
 profile (or the real count of locally published gigs), and one context-appropriate primary action.
 On Published Gigs a search field filters the gigs actually saved on the device. The search is only
 rendered where it filters real saved records, so it can never sit in front of a workflow form.
+
+**No horizontal overflow.** Streamlit's columns default to `min-width: auto`, which lets one long
+title stretch an entire row wider than the viewport. The columns are pinned to `min-width: 0` and
+the text is allowed to wrap, and a `@media (max-width: 1024px)` fallback stacks columns into
+single full-width rows instead of squeezing them. Body copy is capped at a readable measure and the
+content card is capped at 1320 px, so a wide window does not stretch text into long unreadable
+lines. This is verified in-browser on every page at both a laptop and a desktop width.
 
 **Overview.** The home page is a dashboard: a welcome header with the value proposition, the two
 real entry points (*Start a business request*, *Enter the student area*), four metric tiles
@@ -391,7 +403,6 @@ empty state instead of inventing activity.
 
 | Page | Contents |
 |---|---|
-| Create with AI | The concise request form; after generation, the focused FairScope review with the original request, the AI draft, clarity checks, scope signals, AI suggestions, the strategy comparison, **Listen to FairScope**, and *Continue to the Gig Passport*. |
 | Gig Passport | The spacious editor (title, objective, deliverables, required skills, acceptance criteria, collapsible AI suggestions and checks, the full passport sections, acknowledgement checkboxes) and the explicit **Publish gig**. Empty state with a route back to Create when there is no draft. |
 | Published Gigs | Metric tiles, search, and gig cards built from the saved records. Samples listed last and labelled. |
 | Applicants & Interviews | Metric tiles plus the real applicant/interview management. |
@@ -408,7 +419,6 @@ stored status.
 
 **One source of truth.** `ui_common.gig_card()` and the `gig_*` helpers build every gig card from
 the saved record, so the business dashboard, the published list, the student browse grid, the gig
-detail page, and application review cannot contradict each other. The Voice Brief narration is built
 from those same saved fields.
 
 **Honest states preserved.** Loading indicators still appear only where the model is actually
@@ -419,89 +429,36 @@ notifications, or avatars are invented.
 
 ---
 
-## Gigsie Voice Brief (ElevenLabs)
-
-The Voice Brief is a real accessibility and comprehension feature: it narrates **the scope Gigsie
-actually produced**, so a business owner can hear what the draft says, and a student can hear the
-agreed Gig Passport they are being asked to deliver.
-
-Three layers, each doing one job:
-
-| Layer | What it does |
-|---|---|
-| GPT-OSS (Groq) | Understands the business request and drafts or helps structure the task brief. |
-| FairScope (Python) | Analyses the scope: deterministic clarity checks, scope signals, risks, and unanswered questions. |
-| ElevenLabs | Narrates the summary of that scope, so the user can listen to the same information they can read. |
-
-**Where it appears.**
-
-- **Listen to FairScope** on the FairScope review page — the draft, the deliverables, the skills,
-  the stated budget and deadline, the unresolved checks, and the recommended next action.
-- **Listen to this Gig Passport** on the business Gig Passport page and on the student gig detail
-  view — the agreed objective, deliverables, definition of done, inclusions, exclusions, skills,
-  client responsibilities, budget, deadline, and any open questions or warnings.
-
-Both narrations are assembled by `voice_narration.py` from the fields already on screen. The
-narration never contradicts the saved gig: a missing value is spoken as "not specified yet" rather
-than invented.
-
-**How it works.**
-
-- **On demand only.** Audio is generated *only* when the user clicks the playback action. An
-  ordinary Streamlit rerun never generates audio.
-- **Cached per session.** The audio is stored in `st.session_state` under a SHA-256 hash of the
-  narration text, the voice, and the model. Clicking again, or rerunning the page, reuses the same
-  clip and makes no further API request. Change the text, the voice, or the model and the key
-  changes, so the cache invalidates itself.
-- **Official endpoint.** `POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}` with
-  `xi-api-key`, `Content-Type: application/json`, and `Accept: audio/mpeg`, sending
-  `{"text": ..., "model_id": ...}`. The returned bytes are played with `st.audio`.
-- **Bounded.** The narration is trimmed to a readable length on a sentence boundary, and the request
-  uses a timeout, so it is a short summary rather than an audiobook.
-- **No new dependency.** The call uses the Python standard library (`urllib.request`), so
-  `requirements.txt` is unchanged.
-- **Optional.** If `ELEVENLABS_API_KEY` or `ELEVENLABS_VOICE_ID` is missing, the action is replaced
-  by a quiet one-line setup note and the rest of Gigsie continues normally. Nothing is ever written
-  to disk, no narration is created on a rerun, and Gigsie never claims a recording was made unless
-  the API call actually succeeded.
-- **Secrets stay secret.** The key is read from the environment, sent in a header, and never
-  logged, displayed, stored, or included in an error message — including when the API returns an
-  error body that echoes it back.
-
-**Configuration** (placeholders are in `.env.example`; the real `.env` is never committed):
-
-```
-ELEVENLABS_API_KEY=
-ELEVENLABS_VOICE_ID=
-ELEVENLABS_MODEL_ID=        # optional, defaults to eleven_multilingual_v2
-```
-
-> **On the partner prize.** ElevenLabs narration is genuinely implemented in the application and
-> demonstrable in the final recording. Any prize eligibility depends on the challenge's own rules
-> and on this implementation standing on its own merit.
-
----
-
 ## Stage 9 — one navigation system and a focused workspace
 
-Stage 9 addressed the complaints from the screen recording: navigation appeared in more than one
-place, the role switch overlapped page navigation, student pages carried an extra horizontal tab
-bar, and some workflows were spread across long pages of forms.
+Stage 9.1 addressed the defects found by reviewing the real rendered app: the
+sidebar could auto-collapse and leave a large blank panel, the header duplicated
+navigation that the sidebar already provided, titles and step pills were oversized,
+one long gig title stretched the whole page horizontally, and the strategy
+comparison could display *Proposed: Unknown strategy*.
 
-**One navigation.** The sidebar is now the single source of navigation, grouped into Workspace,
-For businesses, For students, and Grow. The Business/Student header switch was kept but now only
-moves the *role*, so it cannot collide with page navigation. The in-page student section switch and
-the segmented tab bar were removed, and the Gig Passport became its own sidebar destination.
+**Navigation.** The sidebar is now permanent (Streamlit's collapse control and
+auto-collapse are disabled) and lists exactly nine destinations in the groups
+Workspace / Business / Student. The header's *← Back to start* link and the
+Business/Student role switch were **removed** — each duplicated a destination the
+sidebar already shows — and `_role_switch` was deleted. The header is now
+breadcrumb, real workspace context, and one primary action.
 
-**One page per workflow.** Create with AI now ends at a focused FairScope review screen instead of
-unrolling the entire workflow; *Continue to the Gig Passport* moves to the dedicated editor and
-publishing page. Applicants & Interviews is no longer appended to the bottom of another page.
+**Layout.** Titles, step pills, and spacing were reduced; the step rail is one
+compact line; the content card is capped at 1320 px with body copy capped at a
+readable measure; and a `@media (max-width: 1024px)` rule stacks columns instead
+of squeezing them. Two conflicting media queries were removed, one of which made
+the page title *larger* below 1100 px and another of which hid the workspace chip
+below 1200 px.
 
-**Tests updated for the changed contract.** Because the duplicate tab bar and the single long form
-were removed on purpose, the handful of assertions that encoded the old navigation shape were
-rewritten to the new one — the same outcomes are still asserted, reached through the sidebar and
-the new *Continue to the Gig Passport* step. No assertion was weakened or removed, and the business
-/student behaviour they covered is still checked.
+**Strategy identity.** Fixed at the data-flow level rather than by relabelling:
+see the note in the FairScope section above.
+
+**Tests updated for the changed contract.** The assertions that encoded the old
+header controls (back-to-start, role switch, the extra sidebar items) were
+rewritten to assert the new behaviour — including a test that the header carries
+*no* navigation control and that *Unknown strategy* can never appear. No assertion
+was weakened or removed, and the workflows they covered are still checked.
 
 ---
 
@@ -509,7 +466,76 @@ the new *Continue to the Gig Passport* step. No assertion was weakened or remove
 
 - Never commit `.env`. It is already ignored by `.gitignore`.
 - `.env.example` contains placeholders only, so it is safe to commit.
-- The API keys are read only inside `gigsie_ai.py` and `voice_narration.py` and are never printed,
-  returned, or embedded in an error message.
-- Inference runs on Groq's servers; no local models are downloaded. Narration runs on ElevenLabs'
-  servers and only when the user explicitly asks for it.
+- `GROQ_API_KEY` is read only inside `gigsie_ai.py` and is never printed, returned, or
+  embedded in an error message.
+- Inference runs on Groq's servers; no local models are downloaded.
+
+---
+
+## Demo runbook: the central flow
+
+This is the path to record for the DEV submission. It runs entirely in the
+browser and needs a `GROQ_API_KEY` in `.env`.
+
+**Setup (once)**
+```powershell
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+# .env contains:  GROQ_API_KEY=your_key_here
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+**1. Business writes a request** — `Create with AI` in the sidebar. Fill the
+form (budget and deadline are required), then **Generate task brief**. One real
+Groq call runs `openai/gpt-oss-20b`; a spinner shows while it works.
+
+**2. FairScope review** appears on the same page and is the centre of the
+product. Point at:
+- the original request beside the AI draft, so the model is visibly a *proposal*;
+- **Clarity check** - deterministic Python results, each labelled;
+- **Scope signals** vs **AI suggestions**, kept clearly apart;
+- **Recommended next action**.
+
+**3. Compare scope strategies** - pick *Outcome-first* from the dropdown and
+click **Generate this strategy version**. A second Groq call returns a
+**Proposed: Outcome-first** panel with *What changed*. Emphasise that the
+current draft is unchanged, and that **Discard proposed version** leaves it
+untouched.
+
+**4. Edit the Gig Passport** - click **Continue to the Gig Passport**. Show the
+**Before you publish** panel (real readiness, computed from the passport), any
+`Needs clarification` rows, and the acknowledgement checkboxes. Then **Publish
+gig**.
+
+**5. Student finds the gig** - `Find Work` in the sidebar. The gig appears as a
+card with budget, deadline, skills and a real skill match. **Create a student
+profile** first if none exists. Open **View Gig** to show the Gig Passport is
+*the same approved scope* the business saved.
+
+**6. Submit a proposal** - write in the proposal box, **Review proposal**, then
+**Submit application**. Apply again on the same gig to show duplicate
+prevention.
+
+**7. Business reviews it** - `Applicants & Interviews`. The saved proposal text
+is shown verbatim with the real status. **Shortlist**, then **Request an
+interview** with a future date.
+
+**8. Interview loop** - back in `Interviews` as the student: **Accept this time**
+(or propose an alternative). As the business: **Confirm agreed time**. The
+status moves to `Confirmed` and is visible to both sides.
+
+**Optional, if time allows** - `Skill Assessments` (generate, answer, and show
+the deterministic Python grade) and `My Applications`.
+
+**What not to claim on camera**: no earnings, user counts, ratings, verified
+market rates, real accounts, payments, or messaging. Gigsie is a single-device
+local prototype; sample gigs are labelled `SAMPLE` and their figures are
+illustrative assumptions.
+
+---
+
+## Hacktoberfest submission slots
+
+- **Demo video / live link:** _to be added before submitting_
+- **Track:** DEV Challenge, Week 2 - Side Hustle
+- **Model:** `openai/gpt-oss-20b` served through Groq

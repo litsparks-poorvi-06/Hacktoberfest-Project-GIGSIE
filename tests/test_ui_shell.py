@@ -174,11 +174,16 @@ class NavigationTests(unittest.TestCase):
                 f"{expected!r} is missing from the sidebar nav: {labels}",
             )
 
-        # The exact groups specified for the sidebar, and nothing duplicated.
-        text = self._markdown(at).upper()
-        for group in ("WORKSPACE", "BUSINESS", "STUDENT"):
-            self.assertIn(group, text)
-        self.assertNotIn("GROW", text)
+        # The exact groups specified for the sidebar. Checked against the nav
+        # model, not against page markdown, which also contains the stylesheet.
+        self.assertEqual(
+            [group for group, _ in ui_common.NAV_GROUPS],
+            ["Workspace", "Business", "Student"],
+        )
+        self.assertEqual(len(ui_common.NAV_GROUPS[0][1]), 1)  # Overview
+        self.assertEqual(len(ui_common.NAV_GROUPS[1][1]), 3)  # Business
+        self.assertEqual(len(ui_common.NAV_GROUPS[2][1]), 5)  # Student
+        self.assertEqual(sum(len(items) for _, items in ui_common.NAV_GROUPS), 9)
 
         # Gig Passport and Student Overview stay real routes but are reached
         # through the workflow, so they are not listed twice at the top level.
@@ -195,6 +200,34 @@ class NavigationTests(unittest.TestCase):
         self.assertNotIn("Back to start", header_labels)
         # No Business/Student switch: the sidebar already groups both.
         self.assertEqual(at.segmented_control, [])
+
+    def test_navigation_can_never_be_stranded(self) -> None:
+        """Regression: hiding Streamlit's sidebar controls hid the nav itself.
+
+        The stylesheet once did ``display: none`` on both the collapse button and
+        the expand control. Streamlit remembers the collapsed state in the
+        browser, so a returning user ended up with no navigation and no way to
+        bring it back. The nav is therefore rendered on every page, and the
+        stylesheet must never hide either control.
+        """
+        css = ui_common._CSS
+        for testid in ("stSidebarCollapseButton", "stExpandSidebarButton"):
+            self.assertNotIn(
+                f"[data-testid=\"{testid}\"] {{ display: none",
+                css,
+                f"the sidebar {testid} must stay reachable",
+            )
+
+        # Every page renders the full navigation, whatever the active view is.
+        for view, section in (
+            (ui_common.VIEW_HOME, ui_common.SEC_OVERVIEW),
+            (ui_common.VIEW_BUSINESS, ui_common.SEC_CREATE),
+            (ui_common.VIEW_STUDENT, ui_common.SEC_FIND_WORK),
+            (ui_common.VIEW_STUDENT, ui_common.SEC_INTERVIEWS),
+        ):
+            at = self._run(view, section)
+            labels = [button.label for button in at.sidebar.button]
+            self.assertEqual(len(labels), 9, f"{view}/{section}: {labels}")
 
     def test_sidebar_navigation_actually_changes_the_page(self) -> None:
         at = self._run(ui_common.VIEW_HOME)

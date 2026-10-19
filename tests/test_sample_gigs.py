@@ -122,6 +122,87 @@ class SampleFileSchemaTests(unittest.TestCase):
             self.assertTrue(validation.get_deliverables(sample))
 
 
+class SampleCoverageTests(unittest.TestCase):
+    """The four release scenarios, and the honesty rules that apply to all of them."""
+
+    #: The scenarios the release must ship, keyed by a word that identifies each.
+    EXPECTED_SCENARIOS = {
+        "bakery": ("bakery", 800.0, "2 days"),
+        "tutor": ("tutoring", 2500.0, "1 week"),
+        "product_descriptions": ("handloom", 1200.0, "3 days"),
+        "presentation": ("slide deck", 1500.0, "4 days"),
+    }
+
+    def _find(self, needle: str) -> dict:
+        for sample in _load_samples():
+            haystack = " ".join(
+                [
+                    str(sample.get("title", "")),
+                    str(sample.get("business_name", "")),
+                    str(sample.get("work_needed", "")),
+                ]
+            ).lower()
+            if needle in haystack:
+                return sample
+        self.fail(f"no sample gig mentions {needle!r}")
+
+    def test_each_required_scenario_is_present_with_its_figures(self) -> None:
+        for label, (needle, budget, deadline) in self.EXPECTED_SCENARIOS.items():
+            with self.subTest(scenario=label):
+                sample = self._find(needle)
+                self.assertEqual(float(sample["budget_inr"]), budget)
+                self.assertEqual(sample["deadline"], deadline)
+
+    def test_the_presentation_sample_uses_owner_supplied_information(self) -> None:
+        brief = self._find("slide deck")["brief"]
+        text = " ".join(
+            [str(brief.get("objective", ""))]
+            + list(brief.get("assumptions") or [])
+            + list(brief.get("client_responsibilities") or [])
+        ).lower()
+        self.assertIn("owner", text)
+        self.assertIn("suppl", text)
+
+    def test_no_sample_promises_work_outside_its_scope(self) -> None:
+        forbidden = [
+            "guarantee",
+            "rank first",
+            "first page of google",
+            "increase sales",
+            "boost sales",
+            "unlimited revisions",
+            "full marketing campaign",
+            "professional photography",
+        ]
+        for sample in _load_samples():
+            haystack = " ".join(
+                [str(sample.get("title", ""))]
+                + list(sample["brief"].get("deliverables") or [])
+                + [str(sample["brief"].get("objective", ""))]
+            ).lower()
+            for phrase in forbidden:
+                self.assertNotIn(
+                    phrase, haystack, f"{sample.get('id')} promises {phrase!r}"
+                )
+
+    def test_every_sample_states_that_its_figures_are_illustrative(self) -> None:
+        for sample in _load_samples():
+            brief = sample["brief"]
+            notes = " ".join(
+                list(brief.get("warnings") or [])
+                + list(brief.get("assumptions") or [])
+                + [str(sample.get("additional_context") or "")]
+            ).lower()
+            self.assertTrue(
+                "illustrative" in notes or "not a verified market rate" in notes,
+                f"{sample.get('id')} does not mark its figures as illustrative",
+            )
+
+    def test_every_sample_is_labelled(self) -> None:
+        for sample in _load_samples():
+            self.assertIs(sample.get("sample"), True, sample.get("id"))
+
+
 class SampleRefreshTests(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()

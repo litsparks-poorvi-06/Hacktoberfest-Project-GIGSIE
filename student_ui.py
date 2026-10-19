@@ -36,7 +36,6 @@ import profiles
 import storage
 import ui_common
 import validation
-import voice_narration
 
 
 # ---------------------------------------------------------------------------
@@ -482,12 +481,6 @@ def _render_gig_detail(gig: dict[str, Any], profile: dict[str, Any] | None) -> N
         body=ui_common.key_values(pairs),
         tags=ui_common.tags(ui_common.gig_skills(gig)),
         fill=True,
-    )
-    ui_common.voice_brief(
-        label="Listen to this Gig Passport",
-        text=voice_narration.build_passport_narration(gig=gig),
-        key=f"voice_gig_{gig.get('id')}",
-        caption="A spoken summary of the agreed scope above - the same text, out loud.",
     )
 
     objective = _gig_objective(gig)

@@ -573,12 +573,13 @@ class InterviewFlowTests(unittest.TestCase):
 
     def test_student_interviews_view_is_offered_alongside_the_others(self) -> None:
         at = self._open_student()
-        # Stage 9: the sidebar is the only navigation, so there is no tab bar.
+        # The sidebar is the only navigation, so there is no tab bar and no
+        # separate Business/Student switch in the header.
         self.assertEqual([tab.label for tab in at.tabs], [])
+        self.assertEqual(at.segmented_control, [])
 
         labels = [button.label for button in at.sidebar.button]
         for expected in (
-            "Student Overview",
             "Find Work",
             "My Profile",
             "My Applications",
@@ -651,7 +652,7 @@ class InterviewFlowTests(unittest.TestCase):
 
     def test_student_can_move_between_business_and_student_views(self) -> None:
         at = self._open_student()
-        _open_sidebar(at, "Overview")
+        self._open_sidebar(at, "Overview")
         self.assertFalse(at.exception)
         _by_label(at.button, "Start a business request").click().run()
         self.assertFalse(at.exception)
