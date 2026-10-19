@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "description": "Synthetic evaluation cases for the Gigsie FairScope experiment. These are invented examples used to measure the draft-then-review workflow. They are not real customers, real jobs, or verified market rates.",
+  "cases": [
+    {
+      "id": "eval_bakery_social",
+      "scenario": "bakery_social_media",
+      "note": "Well-specified request: narrow deliverables, a clear outcome, and a stated budget and deadline.",
+      "request": {
+        "project_name": "Sunrise Bakery",
+        "description": "We want three Instagram images and matching captions for our new seasonal menu.",
+        "outcome": "Regular customers see the new items and visit during the two-week menu period.",
+        "budget": 800,
+        "deadline": "2 days",
+        "extra_context": "We can supply photos of the new menu items taken on a phone."
+      },
+      "expect_detection": false,
+      "expect_reason": "The request is specific, so FairScope should not invent a problem here. Flagging it would be a false positive."
+    },
+    {
+      "id": "eval_tutor_landing",
+      "scenario": "tutor_landing_page",
+      "note": "Well-specified request for a simple informational page with a stated budget and deadline.",
+      "request": {
+        "project_name": "Bright Minds Tutoring",
+        "description": "We need a simple one-page website showing our subjects, our teaching hours, and a contact form link.",
+        "outcome": "Parents who find us can see what we teach and email us for a trial lesson.",
+        "budget": 2500,
+        "deadline": "1 week",
+        "extra_context": "Our subjects and timings are already written down in a plain text file."
+      },
+      "expect_detection": false,
+      "expect_reason": "The scope is bounded and the budget is stated, so no ambiguity is expected."
+    },
+    {
+      "id": "eval_shop_descriptions",
+      "scenario": "shop_product_descriptions",
+      "note": "Fixed number of items, so the deliverable count is checkable.",
+      "request": {
+        "project_name": "Lakshmi Handloom Store",
+        "description": "We need short product descriptions for ten of the sarees listed in our spreadsheet.",
+        "outcome": "Customers browsing the shop can read what each fabric feels like and how to care for it.",
+        "budget": 1200,
+        "deadline": "3 days",
+        "extra_context": "The spreadsheet already has fabric, colour, size, and care columns filled in for most rows."
+      },
+      "expect_detection": true,
+      "expect_reason": "Several rows in a real sheet are often incomplete, so the missing-information checks are expected to fire at least once."
+    },
+    {
+      "id": "eval_spreadsheet_cleanup",
+      "scenario": "spreadsheet_cleanup",
+      "note": "Mechanical, checkable work: the acceptance criterion is a row count.",
+      "request": {
+        "project_name": "Kadamba Exports",
+        "description": "Our stock sheet has duplicate rows and inconsistent date formats. Please tidy it up.",
+        "outcome": "One row per item, with dates written the same way every time.",
+        "budget": 1500,
+        "deadline": "4 days",
+        "extra_context": "The sheet has about 800 rows and four columns: item, quantity, date received, and location."
+      },
+      "expect_detection": false,
+      "expect_reason": "The deliverable and its check are concrete, so FairScope should not flag it."
+    },
+    {
+      "id": "eval_vague_marketing",
+      "scenario": "deliberately_vague_and_over_scoped",
+      "note": "Deliberately under-specified and over-scoped. No deliverables, no exclusions, no skills, and a broad objective. FairScope is expected to detect this.",
+      "request": {
+        "project_name": "Meera Wellness Studio",
+        "description": "We need help with marketing. Do whatever is needed to get us noticed online and grow the business.",
+        "outcome": "More people find us and we get more enquiries and bookings.",
+        "budget": 2000,
+        "deadline": "",
+        "extra_context": ""
+      },
+      "expect_detection": true,
+      "expect_reason": "This is the positive detection case. The objective is vague, there is no deadline, no deliverables, and the request spans a whole marketing campaign. A deterministic checker must flag it."
+    }
+  ]
+}

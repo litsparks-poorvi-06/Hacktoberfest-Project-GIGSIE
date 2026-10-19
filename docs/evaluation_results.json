@@ -1,0 +1,564 @@
+{
+  "model": "openai/gpt-oss-20b (Groq)",
+  "case_count": 5,
+  "results": [
+    {
+      "id": "eval_bakery_social",
+      "scenario": "bakery_social_media",
+      "note": "Well-specified request: narrow deliverables, a clear outcome, and a stated budget and deadline.",
+      "model_parse_problems": [],
+      "draft": {
+        "artefact": "draft",
+        "fields_present": {
+          "title": true,
+          "objective": true,
+          "deliverables": true,
+          "required_skills": true,
+          "clarifying_questions": true,
+          "acceptance_criteria": true,
+          "assumptions": true
+        },
+        "all_required_fields_present": true,
+        "deliverables_count": 1,
+        "deliverables_specific": 1,
+        "criteria_count": 1,
+        "criteria_checkable": 1,
+        "skills_count": 1,
+        "objective_specific": true,
+        "clarifying_questions_count": 2,
+        "budget_preserved": true,
+        "deadline_preserved": true,
+        "noticeable_findings": [],
+        "fairscope_signals": [
+          "The task appears to need assets, content, or account access. Confirm who provides each item; do not assume access, photos, or brand files will be granted."
+        ],
+        "clarity_checks_flagged": [
+          "Clear scope boundaries",
+          "Unanswered questions"
+        ],
+        "clarity_checks_missing": [],
+        "error_level_findings": []
+      },
+      "reviewed": {
+        "artefact": "reviewed",
+        "fields_present": {
+          "objective": true,
+          "deliverables": true,
+          "definition_of_done": true,
+          "required_skills": true
+        },
+        "all_required_fields_present": true,
+        "deliverables_count": 1,
+        "deliverables_specific": 1,
+        "criteria_count": 1,
+        "criteria_checkable": 1,
+        "skills_count": 1,
+        "objective_specific": true,
+        "clarifying_questions_count": 2,
+        "budget_preserved": true,
+        "deadline_preserved": true,
+        "unresolved_sections": [],
+        "essential_gaps": [],
+        "publishable": true
+      },
+      "detection": {
+        "expected": false,
+        "gap_detected": false,
+        "correct": true,
+        "label": "true_negative",
+        "reason": "The request is specific, so FairScope should not invent a problem here. Flagging it would be a false positive."
+      },
+      "advisories_not_scored": [
+        "Clear scope boundaries",
+        "Unanswered questions",
+        "The task appears to need assets, content, or account access. Confirm who provides each item; do not assume access, photos, or brand files will be granted."
+      ],
+      "live": true,
+      "source": "openai/gpt-oss-20b via Groq",
+      "raw_brief": {
+        "title": "Create 3 Instagram posts for new seasonal menu",
+        "objective": "Showcase new seasonal menu items to regular customers and encourage visits during the two\u2011week period.",
+        "deliverables": [
+          "Three Instagram images (1080x1080 JPEG/PNG) with matching captions"
+        ],
+        "required_skills": [
+          "Graphic design for Instagram posts"
+        ],
+        "clarifying_questions": [
+          "Do you have brand guidelines or preferred style for the images and captions?",
+          "Do you want the captions to include specific hashtags or a call\u2011to\u2011action?"
+        ],
+        "acceptance_criteria": [
+          "All three images and captions are delivered in a format ready for Instagram posting and approved by the owner."
+        ],
+        "assumptions": [
+          "Photos provided are of sufficient quality for Instagram use",
+          "Brand assets such as logo are available if needed"
+        ],
+        "warnings": [
+          "With a budget of 800 INR and a 2\u2011day deadline, the scope is limited to basic editing and caption writing; extensive revisions or high\u2011resolution retouching may exceed budget or time."
+        ]
+      }
+    },
+    {
+      "id": "eval_tutor_landing",
+      "scenario": "tutor_landing_page",
+      "note": "Well-specified request for a simple informational page with a stated budget and deadline.",
+      "model_parse_problems": [],
+      "draft": {
+        "artefact": "draft",
+        "fields_present": {
+          "title": true,
+          "objective": true,
+          "deliverables": true,
+          "required_skills": true,
+          "clarifying_questions": true,
+          "acceptance_criteria": true,
+          "assumptions": true
+        },
+        "all_required_fields_present": true,
+        "deliverables_count": 1,
+        "deliverables_specific": 1,
+        "criteria_count": 3,
+        "criteria_checkable": 2,
+        "skills_count": 2,
+        "objective_specific": true,
+        "clarifying_questions_count": 5,
+        "budget_preserved": true,
+        "deadline_preserved": true,
+        "noticeable_findings": [],
+        "fairscope_signals": [
+          "1 acceptance criteria cannot be checked objectively. Rewrite them as something you can confirm (a count, a file, or a plain yes/no)."
+        ],
+        "clarity_checks_flagged": [
+          "Measurable acceptance criteria",
+          "Unanswered questions"
+        ],
+        "clarity_checks_missing": [],
+        "error_level_findings": []
+      },
+      "reviewed": {
+        "artefact": "reviewed",
+        "fields_present": {
+          "objective": true,
+          "deliverables": true,
+          "definition_of_done": true,
+          "required_skills": true
+        },
+        "all_required_fields_present": true,
+        "deliverables_count": 1,
+        "deliverables_specific": 1,
+        "criteria_count": 3,
+        "criteria_checkable": 2,
+        "skills_count": 2,
+        "objective_specific": true,
+        "clarifying_questions_count": 5,
+        "budget_preserved": true,
+        "deadline_preserved": true,
+        "unresolved_sections": [],
+        "essential_gaps": [],
+        "publishable": true
+      },
+      "detection": {
+        "expected": false,
+        "gap_detected": false,
+        "correct": true,
+        "label": "true_negative",
+        "reason": "The scope is bounded and the budget is stated, so no ambiguity is expected."
+      },
+      "advisories_not_scored": [
+        "Measurable acceptance criteria",
+        "Unanswered questions",
+        "1 acceptance criteria cannot be checked objectively. Rewrite them as something you can confirm (a count, a file, or a plain yes/no)."
+      ],
+      "live": true,
+      "source": "openai/gpt-oss-20b via Groq",
+      "raw_brief": {
+        "title": "Create a simple one\u2011page tutoring website",
+        "objective": "Provide parents with a clear overview of subjects, teaching hours, and a way to contact us for a trial lesson.",
+        "deliverables": [
+          "A single HTML page (with optional CSS) that lists subjects, teaching hours, and includes a contact form link (mailto)"
+        ],
+        "required_skills": [
+          "HTML",
+          "CSS"
+        ],
+        "clarifying_questions": [
+          "Do you have a domain and hosting set up, or should the site be hosted on a free platform?",
+          "What email address should the contact form link to?",
+          "Do you have a logo or specific color scheme you want to use?",
+          "Is a responsive design (mobile\u2011friendly) required?",
+          "Can you provide the plain text file with subjects and timings in a format that can be copied into the page?"
+        ],
+        "acceptance_criteria": [
+          "The page displays all subjects and teaching hours exactly as provided.",
+          "The contact form link opens the default mail client with the correct email address pre\u2011filled.",
+          "The page loads correctly in a modern browser within 1 week of project start."
+        ],
+        "assumptions": [
+          "The site will be a static HTML page with no backend processing.",
+          "The contact form will use a mailto link rather than a server\u2011side form.",
+          "Design will be minimal and responsive using basic CSS."
+        ],
+        "warnings": [
+          "The budget of 2500 INR limits custom design and may require free hosting solutions.",
+          "The short 1\u2011week deadline means only a single page with basic styling will be feasible."
+        ]
+      }
+    },
+    {
+      "id": "eval_shop_descriptions",
+      "scenario": "shop_product_descriptions",
+      "note": "Fixed number of items, so the deliverable count is checkable.",
+      "model_parse_problems": [],
+      "draft": {
+        "artefact": "draft",
+        "fields_present": {
+          "title": true,
+          "objective": true,
+          "deliverables": true,
+          "required_skills": true,
+          "clarifying_questions": true,
+          "acceptance_criteria": true,
+          "assumptions": true
+        },
+        "all_required_fields_present": true,
+        "deliverables_count": 1,
+        "deliverables_specific": 1,
+        "criteria_count": 4,
+        "criteria_checkable": 3,
+        "skills_count": 2,
+        "objective_specific": true,
+        "clarifying_questions_count": 4,
+        "budget_preserved": true,
+        "deadline_preserved": true,
+        "noticeable_findings": [],
+        "fairscope_signals": [
+          "1 acceptance criteria cannot be checked objectively. Rewrite them as something you can confirm (a count, a file, or a plain yes/no)."
+        ],
+        "clarity_checks_flagged": [
+          "Measurable acceptance criteria",
+          "Clear scope boundaries",
+          "Unanswered questions"
+        ],
+        "clarity_checks_missing": [],
+        "error_level_findings": []
+      },
+      "reviewed": {
+        "artefact": "reviewed",
+        "fields_present": {
+          "objective": true,
+          "deliverables": true,
+          "definition_of_done": true,
+          "required_skills": true
+        },
+        "all_required_fields_present": true,
+        "deliverables_count": 1,
+        "deliverables_specific": 1,
+        "criteria_count": 4,
+        "criteria_checkable": 3,
+        "skills_count": 2,
+        "objective_specific": true,
+        "clarifying_questions_count": 4,
+        "budget_preserved": true,
+        "deadline_preserved": true,
+        "unresolved_sections": [],
+        "essential_gaps": [],
+        "publishable": true
+      },
+      "detection": {
+        "expected": true,
+        "gap_detected": false,
+        "correct": false,
+        "label": "false_negative",
+        "reason": "Several rows in a real sheet are often incomplete, so the missing-information checks are expected to fire at least once."
+      },
+      "advisories_not_scored": [
+        "Measurable acceptance criteria",
+        "Clear scope boundaries",
+        "Unanswered questions",
+        "1 acceptance criteria cannot be checked objectively. Rewrite them as something you can confirm (a count, a file, or a plain yes/no)."
+      ],
+      "live": true,
+      "source": "openai/gpt-oss-20b via Groq",
+      "raw_brief": {
+        "title": "Write 10 Short Product Descriptions for Lakshmi Handloom Sarees",
+        "objective": "Create concise descriptions that highlight each saree\u2019s fabric feel and care instructions so customers can quickly understand the product.",
+        "deliverables": [
+          "10 product descriptions (50\u201180 words each) for the selected sarees"
+        ],
+        "required_skills": [
+          "copywriting",
+          "product description writing"
+        ],
+        "clarifying_questions": [
+          "Which 10 sarees from the spreadsheet should be described?",
+          "Do you have a preferred tone or brand voice?",
+          "Is there a specific word count or format you want?",
+          "Will you provide the spreadsheet or a link to it?"
+        ],
+        "acceptance_criteria": [
+          "Descriptions are 50\u201180 words long",
+          "Each includes fabric feel and care instructions",
+          "Descriptions match the data in the spreadsheet",
+          "All 10 descriptions are delivered within 3 days"
+        ],
+        "assumptions": [
+          "The spreadsheet is accessible and contains accurate data for the chosen sarees",
+          "Descriptions will be used on the Lakshmi Handloom Store website"
+        ],
+        "warnings": [
+          "The budget of 1200 INR for 10 descriptions may limit depth; ensure expectations are realistic",
+          "The 3\u2011day deadline is tight; any delays may affect the schedule"
+        ]
+      }
+    },
+    {
+      "id": "eval_spreadsheet_cleanup",
+      "scenario": "spreadsheet_cleanup",
+      "note": "Mechanical, checkable work: the acceptance criterion is a row count.",
+      "model_parse_problems": [],
+      "draft": {
+        "artefact": "draft",
+        "fields_present": {
+          "title": true,
+          "objective": true,
+          "deliverables": true,
+          "required_skills": true,
+          "clarifying_questions": true,
+          "acceptance_criteria": true,
+          "assumptions": true
+        },
+        "all_required_fields_present": true,
+        "deliverables_count": 1,
+        "deliverables_specific": 1,
+        "criteria_count": 3,
+        "criteria_checkable": 2,
+        "skills_count": 2,
+        "objective_specific": true,
+        "clarifying_questions_count": 3,
+        "budget_preserved": true,
+        "deadline_preserved": true,
+        "noticeable_findings": [],
+        "fairscope_signals": [
+          "The task appears to need assets, content, or account access. Confirm who provides each item; do not assume access, photos, or brand files will be granted.",
+          "1 acceptance criteria cannot be checked objectively. Rewrite them as something you can confirm (a count, a file, or a plain yes/no)."
+        ],
+        "clarity_checks_flagged": [
+          "Measurable acceptance criteria",
+          "Unanswered questions"
+        ],
+        "clarity_checks_missing": [],
+        "error_level_findings": []
+      },
+      "reviewed": {
+        "artefact": "reviewed",
+        "fields_present": {
+          "objective": true,
+          "deliverables": true,
+          "definition_of_done": true,
+          "required_skills": true
+        },
+        "all_required_fields_present": true,
+        "deliverables_count": 1,
+        "deliverables_specific": 1,
+        "criteria_count": 3,
+        "criteria_checkable": 2,
+        "skills_count": 2,
+        "objective_specific": true,
+        "clarifying_questions_count": 3,
+        "budget_preserved": true,
+        "deadline_preserved": true,
+        "unresolved_sections": [],
+        "essential_gaps": [],
+        "publishable": true
+      },
+      "detection": {
+        "expected": false,
+        "gap_detected": false,
+        "correct": true,
+        "label": "true_negative",
+        "reason": "The deliverable and its check are concrete, so FairScope should not flag it."
+      },
+      "advisories_not_scored": [
+        "Measurable acceptance criteria",
+        "Unanswered questions",
+        "The task appears to need assets, content, or account access. Confirm who provides each item; do not assume access, photos, or brand files will be granted.",
+        "1 acceptance criteria cannot be checked objectively. Rewrite them as something you can confirm (a count, a file, or a plain yes/no)."
+      ],
+      "live": true,
+      "source": "openai/gpt-oss-20b via Groq",
+      "raw_brief": {
+        "title": "Clean and deduplicate stock sheet",
+        "objective": "Remove duplicate rows and standardise all date entries in the 800\u2011row stock sheet so each item appears only once and dates follow a single format.",
+        "deliverables": [
+          "A single Excel/CSV file with 800 rows cleaned, no duplicate rows, dates uniformly formatted, and one row per item"
+        ],
+        "required_skills": [
+          "Spreadsheet data cleaning",
+          "Date formatting in Excel or Google Sheets"
+        ],
+        "clarifying_questions": [
+          "What exact date format would you like the dates to be in (e.g., DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD)?",
+          "How should duplicates be identified \u2013 by all columns matching or just by item name?",
+          "Will the cleaned file be returned in the same format as the original (Excel, CSV, Google Sheet)?"
+        ],
+        "acceptance_criteria": [
+          "The delivered file contains no duplicate rows according to the agreed criteria.",
+          "All date entries are in the specified format.",
+          "Each item appears only once in the sheet."
+        ],
+        "assumptions": [
+          "Duplicates are rows that match exactly across all columns.",
+          "The original file is in a common spreadsheet format (Excel or CSV)."
+        ],
+        "warnings": [
+          "The budget of 1500 INR and 4\u2011day deadline may limit the ability to handle complex duplicate logic or extensive data validation."
+        ]
+      }
+    },
+    {
+      "id": "eval_vague_marketing",
+      "scenario": "deliberately_vague_and_over_scoped",
+      "note": "Deliberately under-specified and over-scoped. No deliverables, no exclusions, no skills, and a broad objective. FairScope is expected to detect this.",
+      "model_parse_problems": [],
+      "draft": {
+        "artefact": "draft",
+        "fields_present": {
+          "title": true,
+          "objective": true,
+          "deliverables": true,
+          "required_skills": true,
+          "clarifying_questions": true,
+          "acceptance_criteria": true,
+          "assumptions": true
+        },
+        "all_required_fields_present": true,
+        "deliverables_count": 2,
+        "deliverables_specific": 2,
+        "criteria_count": 3,
+        "criteria_checkable": 1,
+        "skills_count": 3,
+        "objective_specific": true,
+        "clarifying_questions_count": 14,
+        "budget_preserved": true,
+        "deadline_preserved": true,
+        "noticeable_findings": [],
+        "fairscope_signals": [
+          "The request sounds broad (for example 'manage all' or 'everything'). Narrow it to one specific deliverable with clear boundaries before publishing.",
+          "The task appears to need assets, content, or account access. Confirm who provides each item; do not assume access, photos, or brand files will be granted.",
+          "2 acceptance criteria cannot be checked objectively. Rewrite them as something you can confirm (a count, a file, or a plain yes/no)."
+        ],
+        "clarity_checks_flagged": [
+          "Measurable acceptance criteria",
+          "Clear scope boundaries",
+          "Unanswered questions"
+        ],
+        "clarity_checks_missing": [],
+        "error_level_findings": []
+      },
+      "reviewed": {
+        "artefact": "reviewed",
+        "fields_present": {
+          "objective": true,
+          "deliverables": true,
+          "definition_of_done": true,
+          "required_skills": true
+        },
+        "all_required_fields_present": true,
+        "deliverables_count": 2,
+        "deliverables_specific": 2,
+        "criteria_count": 3,
+        "criteria_checkable": 1,
+        "skills_count": 3,
+        "objective_specific": true,
+        "clarifying_questions_count": 14,
+        "budget_preserved": true,
+        "deadline_preserved": true,
+        "unresolved_sections": [
+          "deadline"
+        ],
+        "essential_gaps": [],
+        "publishable": true
+      },
+      "detection": {
+        "expected": true,
+        "gap_detected": true,
+        "correct": true,
+        "label": "true_positive",
+        "reason": "This is the positive detection case. The objective is vague, there is no deadline, no deliverables, and the request spans a whole marketing campaign. A deterministic checker must flag it."
+      },
+      "advisories_not_scored": [
+        "Measurable acceptance criteria",
+        "Clear scope boundaries",
+        "Unanswered questions",
+        "The request sounds broad (for example 'manage all' or 'everything'). Narrow it to one specific deliverable with clear boundaries before publishing.",
+        "The task appears to need assets, content, or account access. Confirm who provides each item; do not assume access, photos, or brand files will be granted.",
+        "2 acceptance criteria cannot be checked objectively. Rewrite them as something you can confirm (a count, a file, or a plain yes/no)."
+      ],
+      "live": true,
+      "source": "openai/gpt-oss-20b via Groq",
+      "raw_brief": {
+        "title": "Create a basic social media marketing plan for Meera Wellness Studio",
+        "objective": "Help Meera Wellness Studio increase online visibility and generate more enquiries and bookings.",
+        "deliverables": [
+          "1-week social media content calendar with 3 sample posts",
+          "1 ad copy for Facebook/Instagram"
+        ],
+        "required_skills": [
+          "Social media marketing",
+          "Content creation",
+          "Copywriting"
+        ],
+        "clarifying_questions": [
+          "Which social media platforms do you want to focus on?",
+          "Do you have any existing branding or visual assets?",
+          "What is your target audience?",
+          "Do you have a preferred tone or style?",
+          "What is your preferred deadline for the deliverables?",
+          "Do you have any existing marketing materials or website?",
+          "What is the main service you want to promote?",
+          "Do you want any paid advertising setup?",
+          "Do you have any specific goals or metrics?",
+          "Do you have any budget for paid ads?",
+          "Do you have any existing social media accounts?",
+          "Do you want any analytics tracking?",
+          "Do you want any follow-up support?",
+          "Do you want any additional deliverables?"
+        ],
+        "acceptance_criteria": [
+          "The client approves the content calendar and ad copy",
+          "The deliverables are delivered in PDF or doc format",
+          "The content aligns with the brand voice"
+        ],
+        "assumptions": [
+          "The client has at least one social media account",
+          "The client has a clear brand identity",
+          "The client will provide any necessary brand assets",
+          "The client will provide feedback within 3 days"
+        ],
+        "warnings": [
+          "The budget of 2000 INR is very low for comprehensive marketing; scope is limited",
+          "The deliverables are only a basic plan; additional work will require more budget",
+          "The deadline is not specified; please provide a timeline",
+          "The scope may not include paid ad setup or detailed analytics"
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "cases_measured": 5,
+    "draft_all_fields_present_pct": 100.0,
+    "reviewed_all_fields_present_pct": 100.0,
+    "draft_budget_preserved_pct": 100.0,
+    "reviewed_budget_preserved_pct": 100.0,
+    "draft_deadline_preserved_pct": 100.0,
+    "reviewed_deadline_preserved_pct": 100.0,
+    "detection_correct": 4,
+    "detection_total": 5,
+    "true_positives": 1,
+    "true_negatives": 3
+  },
+  "caveat": "Automated structural measurements only. No quality, fairness, or accuracy score is claimed; those require human judgement.",
+  "replay_instructions": "Each result carries the raw 'raw_brief' returned by the model, so the rubric can be re-applied without spending API credit. Re-score with evaluate_case(case, result['raw_brief'])."
+}

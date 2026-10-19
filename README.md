@@ -462,6 +462,30 @@ was weakened or removed, and the workflows they covered are still checked.
 
 ---
 
+## FairScope evaluation experiment
+
+Gigsie's draft-then-review workflow is evaluated by a small reproducible harness
+rather than asserted by hand:
+
+```powershell
+# structural self-check, no API calls
+.\.venv\Scripts\python.exe scripts\evaluate_fairscope.py --self-check
+
+# live run: 5 synthetic cases, 5 Groq calls, writes real results
+.\.venv\Scripts\python.exe scripts\evaluate_fairscope.py --live --json docs\evaluation_results.json
+```
+
+The dataset is `data/evaluation_cases.json` (five synthetic scenarios, clearly
+labelled as invented examples, not real jobs or verified market rates). The
+rubric reuses the product's own `fairscope` and `validation` helpers, scores the
+raw draft and the reviewed Gig Passport with the same measurements, and reports
+**structural measurements only** - never a quality, fairness, or accuracy score.
+
+Method, criteria, measured results, failure cases, and limitations:
+[`docs/FAIRSCOPE_EVALUATION.md`](docs/FAIRSCOPE_EVALUATION.md).
+
+---
+
 ## Safety
 
 - Never commit `.env`. It is already ignored by `.gitignore`.
